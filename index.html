@@ -1,0 +1,3288 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dakons Map - DM Screen</title>
+    <style>
+        :root {
+            --color-background: #1a1a1a;
+            --color-surface: #2d2d2d;
+            --color-text: #e8e8e8;
+            --color-text-secondary: #a0a0a0;
+            --color-primary: #8b4513;
+            --color-primary-hover: #a0522d;
+            --color-border: rgba(139, 69, 19, 0.4);
+            --color-secondary: rgba(139, 69, 19, 0.2);
+            --color-secondary-hover: rgba(139, 69, 19, 0.3);
+            --radius-base: 8px;
+            --radius-lg: 12px;
+            --space-8: 8px;
+            --space-12: 12px;
+            --space-16: 16px;
+            --space-20: 20px;
+            --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.04), 0 2px 4px -1px rgba(0, 0, 0, 0.02);
+            --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.04), 0 4px 6px -2px rgba(0, 0, 0, 0.02);
+            --grid-size: 35px;
+        }
+
+        @media (prefers-color-scheme: dark) {
+            :root {
+                --color-background: #0d0d0d;
+                --color-surface: #1f1f1f;
+                --color-text: #f0e6d6;
+                --color-text-secondary: #b8a890;
+                --color-primary: #d4a574;
+                --color-primary-hover: #e6b886;
+                --color-border: rgba(212, 165, 116, 0.3);
+                --color-secondary: rgba(212, 165, 116, 0.15);
+                --color-secondary-hover: rgba(212, 165, 116, 0.25);
+            }
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: 'Modesto Condensed', 'Cinzel', Georgia, serif;
+            background: var(--color-background);
+            color: var(--color-text);
+            margin: 0; padding: 0; overflow: hidden;
+            transition: background 0.3s;
+        }
+
+        /* Fullscreen Mode Styles */
+        body.fullscreen-mode .header,
+        body.fullscreen-mode .sidebar,
+        body.fullscreen-mode .promo-credit,
+        body.fullscreen-mode .zoom-controls { display: none !important; }
+        
+        body.fullscreen-mode .zoom-controls { display: flex !important; }
+
+        .container { width: 100vw; height: 100vh; margin: 0; position: relative; }
+
+        .header {
+            display: flex; justify-content: space-between; align-items: center;
+            padding: 0 var(--space-20);
+            background: rgba(29, 29, 29, 0.95);
+            border-bottom: 2px solid var(--color-primary);
+            border-top: 2px solid var(--color-primary);
+            position: fixed; top: 0; left: 0; right: 0;
+            z-index: 100; backdrop-filter: blur(10px);
+            box-shadow: 0 4px 12px rgba(139, 69, 19, 0.3);
+            height: 70px; /* Lebih ramping dikit */
+        }
+
+        .header-group {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        h1 {
+            font-size: 24px; font-weight: 700; letter-spacing: 2px;
+            text-transform: uppercase; color: var(--color-primary);
+            margin: 0 16px; user-select: none;
+        }
+
+        .btn {
+            display: flex; align-items: center; gap: 8px; justify-content: center;
+            padding: 8px 16px; height: 40px;
+            border: 1px solid var(--color-primary);
+            border-radius: 6px; cursor: pointer;
+            font-size: 13px; font-weight: 600;
+            transition: all 0.2s; text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        /* Varian Tombol Icon Bulat (Buat Reset, Fullscreen, dll) */
+        .btn-icon-only {
+            padding: 0; width: 40px; border-radius: 50%; font-size: 18px;
+        }
+
+        .btn-primary { background: var(--color-primary); color: #1a1a1a; }
+        .btn-primary:hover { background: var(--color-primary-hover); transform: translateY(-2px); }
+
+        .btn-secondary { background: rgba(255,255,255,0.05); color: var(--color-text); border-color: var(--color-text-secondary); }
+        .btn-secondary:hover { background: rgba(255,255,255,0.1); border-color: var(--color-primary); transform: translateY(-2px); }
+
+        .btn-reset { border-color: #c0392b; color: #c0392b; background: transparent; }
+        .btn-reset:hover { background: #c0392b; color: white; }
+
+        .btn:disabled { opacity: 0.3; cursor: not-allowed; transform: none; }
+
+        .divider { width: 1px; height: 24px; background: var(--color-border); margin: 0 4px; }
+
+        /* Responsive: Teks ilang kalau layar sempit */
+        @media (max-width: 1100px) {
+            .btn-text { display: none; }
+            .btn { padding: 0; width: 40px; border-radius: 50%; justify-content: center; }
+            .btn svg, .btn-icon-only { font-size: 18px; }
+            h1 { font-size: 18px; margin: 0 8px; }
+        }
+
+        #exitFullscreenBtn {
+            display: none; position: fixed; top: 20px; right: 20px; z-index: 1000;
+            padding: 10px 20px; background: rgba(139, 69, 19, 0.8);
+            backdrop-filter: blur(5px); border: 2px solid var(--color-primary);
+            color: white; border-radius: 4px; cursor: pointer;
+            font-weight: bold; box-shadow: 0 0 15px rgba(0,0,0,0.5);
+        }
+        
+        body.fullscreen-mode #exitFullscreenBtn { display: block; animation: fadeIn 0.5s; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(-10px); } to { opacity: 1; transform: translateY(0); } }
+
+        .main-content { width: 100%; height: 100%; position: relative; }
+
+        .sidebar {
+            width: 320px; background: rgba(29, 29, 29, 0.95);
+            padding: var(--space-16); border-radius: 4px;
+            border: 2px solid var(--color-primary);
+            position: fixed; left: var(--space-20); top: 90px; /* Diturunin dikit biar aman */
+            max-height: calc(100vh - 110px); overflow-y: auto;
+            z-index: 50; backdrop-filter: blur(10px);
+            box-shadow: 0 4px 16px rgba(139, 69, 19, 0.4);
+            transition: opacity 0.3s ease, transform 0.3s ease;
+        }
+        
+        .sidebar.hidden { opacity: 0; transform: translateX(-20px); pointer-events: none; }
+        @media (prefers-color-scheme: dark) { .sidebar { background: rgba(13, 13, 13, 0.95); } }
+
+        .sidebar h2 { font-size: 18px; margin-bottom: var(--space-16); }
+
+        .upload-zone {
+            border: 2px dashed var(--color-border);
+            border-radius: var(--radius-base); padding: var(--space-20);
+            text-align: center; cursor: pointer;
+            transition: all 0.2s; margin-bottom: var(--space-16);
+        }
+        .upload-zone:hover, .upload-zone.dragover { border-color: var(--color-primary); background: var(--color-secondary); }
+
+        .image-container {
+            width: 100%; height: 100vh; background: var(--color-background);
+            position: fixed; top: 0; left: 0;
+            display: flex; align-items: center; justify-content: center; z-index: 1;
+        }
+
+        .image-wrapper {
+            position: relative; width: 95vw; height: 95vh;
+            display: flex; align-items: center; justify-content: center; cursor: grab;
+        }
+        body.fullscreen-mode .image-wrapper { width: 100vw; height: 100vh; }
+        .image-wrapper.dragging { cursor: grabbing; }
+
+        .main-image { max-width: 100%; max-height: 100%; width: auto; height: auto; display: block; object-fit: contain; }
+        .image-inner { position: relative; display: inline-block; line-height: 0; }
+        
+        /* Grid System */
+        .grid-overlay {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            pointer-events: none; z-index: 5; display: none;
+            background-image: 
+                linear-gradient(to right, rgba(255, 255, 255, 0.3) 1px, transparent 1px),
+                linear-gradient(to bottom, rgba(255, 255, 255, 0.3) 1px, transparent 1px);
+        }
+        .grid-overlay.active { display: block; }
+        
+        .grid-controls {
+            margin-top: 16px; margin-bottom: 16px; padding: 12px;
+            background: rgba(0,0,0,0.2); border-radius: 8px;
+            border: 1px solid var(--color-border);
+        }
+        .grid-control-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; font-size: 14px; }
+        .grid-input { width: 60px; padding: 4px; border-radius: 4px; border: 1px solid var(--color-border); background: var(--color-surface); color: var(--color-text); }
+
+        /* Pins and Tokens */
+        .pin, .token {
+            position: absolute; width: 32px; height: 32px;
+            cursor: pointer; transform: translate(-50%, -50%);
+            transition: transform 0.2s, top 0s, left 0s; z-index: 10;
+        }
+        
+        .token {
+            position: absolute;
+            cursor: grab;
+            transition: transform 0.2s, width 0.2s, height 0.2s; /* Tambah animasi resize */
+            touch-action: none;
+            display: flex; align-items: center; justify-content: center;
+            z-index: 10;
+            
+            /* INI KUNCINYA: Lebar = Grid Size x Skala Token */
+            width: calc(var(--grid-size) * var(--scale, 1));
+            height: calc(var(--grid-size) * var(--scale, 1));
+            
+            /* Biar posisinya tetap centered di titik koordinat */
+            transform: translate(-50%, -50%);
+        }
+        .token:active { cursor: grabbing; }
+
+        .pin:hover { transform: translate(-50%, -50%) scale(1.2); z-index: 100; }
+        .token:hover { z-index: 100; }
+        
+        .token.dragging { z-index: 1000; transition: none; pointer-events: none; }
+
+        /* Resize Handle */
+        .resize-handle {
+            position: absolute; bottom: 0; right: 0; width: 12px; height: 12px;
+            background: white; border: 1px solid #333; border-radius: 50%;
+            cursor: nwse-resize; z-index: 20; opacity: 0; transition: opacity 0.2s;
+        }
+        .token:hover .resize-handle, .token.resizing .resize-handle { opacity: 1; }
+        .token.resizing { transition: none; z-index: 1000; border: 1px dashed var(--color-primary); }
+
+        .pin-icon {
+            width: 100%; height: 100%; background: var(--color-primary);
+            border-radius: 50% 50% 50% 0; transform: rotate(-45deg);
+            border: 3px solid #1a1a1a;
+            box-shadow: 0 2px 8px rgba(139, 69, 19, 0.6), 0 0 12px rgba(212, 165, 116, 0.4);
+        }
+
+        .token-icon {
+            width: 100%; height: 100%; border-radius: 50%;
+            border: 3px solid #fff; box-shadow: 0 4px 8px rgba(0,0,0,0.5);
+            display: flex; align-items: center; justify-content: center;
+            font-weight: bold; color: white;
+            text-shadow: 1px 1px 2px black;
+            overflow: hidden; 
+            background-color: #333;
+        }
+
+        .token-player .token-icon { background: #2ecc71; border-color: #27ae60; }
+        .token-enemy .token-icon { 
+            background: #e74c3c; 
+            border-color: #c0392b; 
+            /* INI KUNCINYA: Font size ngikutin Grid x Scale */
+            font-size: calc(var(--grid-size) * var(--scale, 1) * 0.6); 
+            display: flex; 
+            align-items: center; 
+            justify-content: center;
+            padding-bottom: 2px; /* Koreksi dikit biar pas tengah */
+        }
+        .token-npc .token-icon { background: #f1c40f; border-color: #f39c12; color: black; text-shadow: none; }
+
+        .pin::after, .token::after {
+            content: attr(data-name); position: absolute;
+            bottom: 110%; left: 50%; transform: translateX(-50%);
+            background: rgba(0,0,0,0.8); color: white;
+            padding: 4px 8px; border-radius: 4px; font-size: 12px;
+            white-space: nowrap; opacity: 0; pointer-events: none;
+            transition: opacity 0.2s;
+        }
+        .pin:hover::after, .token:hover::after { opacity: 1; }
+        .token.dragging::after, .token.resizing::after { display: none; }
+
+        .pin-preview {
+            position: fixed; width: 32px; height: 32px;
+            pointer-events: none; transform: translate(-50%, -50%);
+            z-index: 1000; display: none; opacity: 0.6;
+        }
+        .pin-preview.active { display: block; }
+
+        .placeholder { text-align: center; color: var(--color-text-secondary); }
+        .placeholder svg { width: 64px; height: 64px; margin-bottom: var(--space-16); opacity: 0.3; }
+
+        .pin-list { margin-top: var(--space-16); }
+
+        .pin-item {
+            padding: var(--space-12); background: var(--color-secondary);
+            border-radius: var(--radius-base); margin-bottom: var(--space-8);
+            font-size: 14px; display: flex; justify-content: space-between;
+            align-items: center; gap: var(--space-8);
+        }
+        .pin-item-info { flex: 1; }
+        .pin-item-actions { display: flex; gap: var(--space-8); }
+        .pin-item button {
+            background: none; border: none; color: var(--color-primary);
+            cursor: pointer; font-size: 12px; padding: 4px 8px;
+        }
+        .pin-item button:hover { text-decoration: underline; }
+        .pin-item button.delete-btn { color: #c01529; }
+
+        .list-icon-wrapper {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 24px;
+            height: 24px;
+            margin-right: 8px;
+            overflow: hidden;
+            border-radius: 50%;
+            border: 1px solid var(--color-border);
+            flex-shrink: 0;
+            background: #000;
+        }
+
+        /* Pastikan gambar di dalamnya fit */
+        .list-icon-wrapper img {
+            width: 100%; height: 100%; object-fit: cover;
+        }
+
+        .zoom-controls {
+            position: fixed; bottom: var(--space-20); right: var(--space-20);
+            display: flex; flex-direction: column; gap: var(--space-8); z-index: 50;
+        }
+
+        .zoom-btn {
+            width: 48px; height: 48px; border-radius: 50%;
+            background: rgba(252, 252, 249, 0.9); border: 1px solid var(--color-border);
+            display: flex; align-items: center; justify-content: center;
+            cursor: pointer; font-size: 24px; transition: all 0.2s; backdrop-filter: blur(10px);
+        }
+        @media (prefers-color-scheme: dark) { .zoom-btn { background: rgba(38, 40, 40, 0.9); } }
+        .zoom-btn:hover { background: var(--color-secondary-hover); transform: scale(1.1); }
+
+        .modal {
+            display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0, 0, 0, 0.5); z-index: 200; align-items: center; justify-content: center;
+        }
+        .modal.active { display: flex; }
+        .modal-content {
+            background: var(--color-surface); padding: var(--space-20);
+            border-radius: var(--radius-lg); max-width: 400px; width: 90%;
+        }
+        .modal-content h3 { margin-bottom: var(--space-16); }
+        .modal-content input {
+            width: 100%; padding: var(--space-8); border: 1px solid var(--color-border);
+            border-radius: var(--radius-base); margin-bottom: var(--space-16);
+            background: var(--color-background); color: var(--color-text); font-size: 14px;
+        }
+        .modal-actions { display: flex; gap: var(--space-8); justify-content: flex-end; }
+
+        .image-switch-btn { position: fixed; bottom: 200px; right: var(--space-20); z-index: 50; display: none; }
+        .image-switch-btn.visible { display: block; }
+
+        .mode-indicator {
+            padding: var(--space-8) var(--space-12); background: var(--color-secondary);
+            border-radius: var(--radius-base); font-size: 12px; margin-bottom: var(--space-16); text-align: center;
+        }
+
+        .mode-toggle { display: flex; gap: var(--space-8); margin-bottom: var(--space-16); }
+        .mode-toggle button {
+            flex: 1; padding: var(--space-12); border: 2px solid var(--color-primary);
+            border-radius: var(--radius-base); background: var(--color-secondary);
+            color: var(--color-text); cursor: pointer; font-weight: 600; transition: all 0.2s;
+        }
+        .mode-toggle button.active { background: var(--color-primary); color: #1a1a1a; }
+        .mode-toggle button:hover { transform: translateY(-2px); }
+
+        .tool-selector {
+            display: grid; grid-template-columns: 1fr 1fr; gap: 8px;
+            margin-bottom: 16px; padding: 10px; background: rgba(0,0,0,0.2); border-radius: 8px;
+        }
+        .tool-btn {
+            padding: 8px; font-size: 12px; cursor: pointer;
+            background: var(--color-surface); border: 1px solid var(--color-border);
+            border-radius: 4px; color: var(--color-text); text-align: left;
+            display: flex; align-items: center; gap: 6px;
+        }
+        .tool-btn:hover { background: var(--color-secondary-hover); }
+        .tool-btn.active {
+            border-color: var(--color-primary); background: var(--color-secondary);
+            box-shadow: 0 0 5px var(--color-primary);
+        }
+
+        .breadcrumb {
+            display: flex; gap: var(--space-8); align-items: center;
+            font-size: 12px; color: var(--color-text-secondary); margin-bottom: var(--space-16);
+        }
+        .breadcrumb-item { cursor: pointer; color: var(--color-primary); }
+        .breadcrumb-item:hover { text-decoration: underline; }
+
+        input[type="file"] { display: none; }
+    
+        .promo-credit {
+            position: fixed; left: var(--space-20); bottom: var(--space-20); z-index: 60;
+            padding: 8px 12px; background: rgba(29, 29, 29, 0.85);
+            border: 1px solid var(--color-border); border-radius: var(--radius-base);
+            backdrop-filter: blur(8px); box-shadow: var(--shadow-md);
+            font-size: 12px; color: var(--color-text-secondary); user-select: none; max-width: 70vw;
+        }
+        @media (prefers-color-scheme: dark) { .promo-credit { background: rgba(13, 13, 13, 0.85); } }
+        .promo-credit a { color: var(--color-primary); text-decoration: none; font-weight: 700; }
+        .promo-credit a:hover { text-decoration: underline; }
+        /* --- TAMBAHAN STYLE SELEKSI --- */
+        .selection-box {
+            position: absolute;
+            border: 1px dashed var(--color-primary);
+            background-color: rgba(139, 69, 19, 0.2);
+            z-index: 9999;
+            pointer-events: none; /* Biar gak ganggu mouse */
+            display: none;
+        }
+
+        .token.selected .token-icon {
+            /* HAPUS box-shadow yang lama */
+            box-shadow: none; 
+            /* Ganti jadi garis putus-putus warna kuning/emas */
+            border: 2px dashed #f1c40f; 
+            transform: scale(1.1);
+            /* Biar bordernya ada di dalem lingkaran */
+            box-sizing: border-box; 
+        }
+
+        .add-player-form select {
+            width: 100%;
+            padding: var(--space-8);
+            background: var(--color-background);
+            color: var(--color-text);
+            border: 1px solid var(--color-border);
+            border-radius: var(--radius-base);
+            font-size: 14px;
+        }
+
+        /* --- ICON STYLES --- */
+        .token svg {
+            width: 60%;
+            height: 60%;
+            fill: white;
+            filter: drop-shadow(1px 1px 1px rgba(0,0,0,0.8));
+        }
+
+        /* --- PLAYER SELECTION MODAL --- */
+        .player-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+            gap: 8px;
+            margin-bottom: 16px;
+            max-height: 200px;
+            overflow-y: auto;
+        }
+
+        .player-card {
+            background: var(--color-background);
+            border: 1px solid var(--color-border);
+            border-radius: 8px;
+            padding: 8px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.2s;
+            position: relative;
+        }
+
+        .player-card:hover {
+            border-color: var(--color-primary);
+            background: var(--color-secondary);
+        }
+
+        .player-card-icon {
+            width: 40px; height: 40px;
+            border-radius: 50%; /* Bikin bulat juga */
+            overflow: hidden;   /* Potong sudut */
+            margin: 0 auto 4px auto; /* Tengahin */
+            border: 1px solid var(--color-border);
+        }
+
+        .player-card-icon img {
+            width: 100%; height: 100%;
+            object-fit: cover;
+        }
+
+        .player-card-name {
+            font-weight: bold;
+            font-size: 12px;
+            color: var(--color-primary);
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .player-card-stats {
+            font-size: 10px;
+            color: var(--color-text-secondary);
+        }
+
+        .add-player-card {
+            border: 1px dashed var(--color-text-secondary);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
+            color: var(--color-text-secondary);
+        }
+
+        .add-player-form {
+            background: rgba(0,0,0,0.2);
+            padding: 10px;
+            border-radius: 8px;
+            margin-top: 10px;
+            display: none; /* Hidden by default */
+        }
+
+        .delete-player-btn {
+            position: absolute;
+            top: -5px;
+            right: -5px;
+            background: #c0392b;
+            color: white;
+            border-radius: 50%;
+            width: 16px;
+            height: 16px;
+            font-size: 10px;
+            line-height: 16px;
+            text-align: center;
+            display: none;
+        }
+        .player-card:hover .delete-player-btn { display: block; }
+
+        /* --- ACCORDION LIST STYLES --- */
+        .section-header {
+            background: rgba(0,0,0,0.2);
+            padding: 8px 12px;
+            border-radius: 4px;
+            margin-top: 12px;
+            cursor: pointer;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 13px;
+            font-weight: bold;
+            color: var(--color-primary);
+            border: 1px solid transparent;
+            transition: all 0.2s;
+        }
+
+        .section-header:hover {
+            background: rgba(0,0,0,0.3);
+            border-color: var(--color-border);
+        }
+
+        .section-content {
+            max-height: 250px; /* Batas tinggi, kalau lebih dia scroll */
+            overflow-y: auto;
+            background: rgba(0,0,0,0.1);
+            border-radius: 0 0 4px 4px;
+            margin-bottom: 8px;
+            display: block; /* Default muncul */
+        }
+
+        .section-content.collapsed {
+            display: none; /* Kalau dilipat hilang */
+        }
+
+        .token-icon img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover; /* MAGIC: Memaksa gambar menuhin lingkaran (zoom-to-fill) */
+            display: block;
+            pointer-events: none;
+        }
+
+        .form-row {
+            display: flex; gap: 8px; margin-bottom: 12px;
+        }
+
+        .stat-grid-6 {
+            display: grid; 
+            grid-template-columns: repeat(6, 1fr); 
+            gap: 4px;
+            margin-bottom: 12px;
+            background: rgba(0,0,0,0.1);
+            padding: 8px;
+            border-radius: 6px;
+        }
+
+        .stat-box {
+            display: flex; flex-direction: column; align-items: center;
+        }
+
+        .stat-box label {
+            font-size: 9px; font-weight: bold; color: var(--color-primary);
+            margin-bottom: 2px; text-transform: uppercase;
+        }
+
+        .stat-box input {
+            width: 100%; text-align: center; padding: 4px 2px;
+            font-size: 12px; font-weight: bold;
+            margin-bottom: 0 !important; /* Override margin input bawaan */
+        }
+
+        .section-label {
+            font-size: 11px; color: var(--color-text-secondary);
+            margin-bottom: 4px; text-transform: uppercase; letter-spacing: 1px;
+        }
+
+        /* Biar input number gak ada panah up/down yang ganggu */
+        input[type=number]::-webkit-inner-spin-button, 
+        input[type=number]::-webkit-outer-spin-button { 
+        -webkit-appearance: none; margin: 0; 
+        }
+
+        img.token-img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover; /* Kuncinya disini: Zoom-to-fill yang rapi */
+            display: block;
+        }
+
+        .char-popup {
+            position: fixed;
+            z-index: 2000;
+            width: 280px;
+            background: rgba(20, 20, 20, 0.95);
+            backdrop-filter: blur(10px);
+            border: 1px solid var(--color-primary);
+            border-radius: 12px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+            color: white;
+            padding: 0;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            
+            /* [FIX UTAMA: JANGAN PAKAI DISPLAY NONE] */
+            visibility: hidden; /* Ganti display:none jadi ini */
+            opacity: 0;
+            pointer-events: none; /* Biar gak bisa diklik pas ngilang */
+            
+            /* Setting Animasi Awal: Agak turun (15px) dan kecil (0.9) */
+            transform: translateY(15px) scale(0.9);
+            transform-origin: bottom left; 
+            
+            /* Transisi Halus */
+            transition: 
+            opacity 0.2s ease, 
+            transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275), /* Efek Membal */
+            visibility 0.2s,
+            top 0.3s cubic-bezier(0.25, 1, 0.5, 1),   /* <--- INI BIAR MELUNCUR */
+            left 0.3s cubic-bezier(0.25, 1, 0.5, 1);  /* <--- INI JUGA */
+            
+            overflow: visible; 
+        }
+
+        .char-popup.flipped {
+            transform-origin: top left; 
+        }
+
+        .char-popup.active {
+            /* [FIX UTAMA] Munculkan dengan visibility */
+            visibility: visible;
+            opacity: 1;
+            pointer-events: auto;
+            
+            /* Posisi Akhir: Normal */
+            transform: translateY(0) scale(1);
+        }
+
+        /* PANAH GELEMBUNG (Chat Bubble Arrow) */
+        .char-popup::after {
+            content: '';
+            position: absolute;
+            
+            /* Logic Posisi Panah */
+            bottom: -10px; 
+            /* INI KUNCINYA: Pakai variable, default di tengah (50%) */
+            left: var(--arrow-left, 50%); 
+            transform: translateX(-50%); /* Biar titik tengah panah yg jadi patokan */
+            
+            /* Bentuk Segitiga */
+            width: 0; 
+            height: 0; 
+            border-left: 10px solid transparent;
+            border-right: 10px solid transparent;
+            border-top: 10px solid rgba(20, 20, 20, 0.95); 
+            filter: drop-shadow(0 2px 2px rgba(0,0,0,0.3));
+            
+            /* Animasi halus kalau panah geser */
+            transition: left 0.1s ease, top 0.2s, bottom 0.2s;
+        }
+
+        /* Kalo Flipped (Panah di Atas), kita cuma ubah border & posisi vertikal */
+        .char-popup.flipped::after {
+            top: -10px;
+            bottom: auto;
+            border-top: none;
+            border-bottom: 10px solid rgba(20, 20, 20, 0.95);
+        }
+
+        /* Header: Icon + Nama + Level */
+        .char-header {
+            display: flex;
+            align-items: center;
+            padding: 12px;
+            background: linear-gradient(135deg, rgba(139, 69, 19, 0.3) 0%, rgba(20, 20, 20, 0) 100%);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 12px 12px 0 0;
+            gap: 10px;
+        }
+
+        .char-icon-frame {
+            width: 48px; height: 48px;
+            border-radius: 50%;
+            border: 2px solid var(--color-primary);
+            overflow: hidden;
+            background: #000;
+            flex-shrink: 0;
+        }
+        .char-icon-frame img { width: 100%; height: 100%; object-fit: cover; }
+
+        .char-info h3 { margin: 0; font-size: 16px; color: var(--color-primary); line-height: 1.2; }
+        .char-info span { font-size: 11px; color: #aaa; text-transform: uppercase; letter-spacing: 1px; }
+
+        /* Stat Bar (HP, AC, Speed) */
+        .char-vitals {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr 1fr;
+            gap: 1px;
+            background: rgba(255,255,255,0.1); /* Garis pemisah */
+            margin-bottom: 8px;
+        }
+        .vital-box {
+            background: rgba(20,20,20,0.8);
+            text-align: center;
+            padding: 6px 2px;
+        }
+        .vital-label { font-size: 9px; color: #888; text-transform: uppercase; display: block; }
+        .vital-val { font-size: 14px; font-weight: bold; color: white; }
+        .vital-val.hp { color: #e74c3c; }
+        .vital-val.ac { color: #f1c40f; }
+
+        /* Ability Scores Grid */
+        .char-stats {
+            display: grid;
+            grid-template-columns: repeat(6, 1fr);
+            gap: 4px;
+            padding: 0 12px 12px 12px;
+        }
+        .ability-box {
+            text-align: center;
+            background: rgba(255,255,255,0.03);
+            border-radius: 4px;
+            padding: 4px 0;
+        }
+        .abil-name { font-size: 9px; font-weight: bold; color: #666; display: block; margin-bottom: 2px; }
+        .abil-mod { font-size: 14px; font-weight: bold; color: white; display: block; }
+        .abil-score { font-size: 9px; color: #555; }
+
+        /* Actions Footer */
+        .char-actions {
+            padding: 8px 12px;
+            border-top: 1px solid rgba(255,255,255,0.1);
+            display: flex;
+            justify-content: flex-end;
+            gap: 8px;
+        }
+        .mini-btn {
+            font-size: 10px; padding: 4px 8px;
+            background: transparent; border: 1px solid var(--color-text-secondary);
+            color: var(--color-text-secondary); border-radius: 4px; cursor: pointer;
+        }
+        .mini-btn:hover { border-color: var(--color-primary); color: var(--color-primary); }
+
+        .token-hp-bar {
+            position: absolute;
+            bottom: -6px; /* Muncul di bawah kaki token */
+            left: 50%;
+            transform: translateX(-50%);
+            width: 90%; /* Hampir selebar tokennya */
+            height: 5px;
+            background: #2c3e50; /* Background gelap */
+            border: 1px solid rgba(255,255,255,0.3);
+            border-radius: 4px;
+            overflow: hidden;
+            z-index: 20;
+            pointer-events: none; /* Biar gak ganggu klik */
+            box-shadow: 0 2px 4px rgba(0,0,0,0.5);
+        }
+
+        .token-hp-fill {
+            width: 100%; /* Nanti ini bisa gerak kalau udah ada logicnya */
+            height: 100%;
+            background: linear-gradient(to right, #2ecc71, #27ae60); /* Gradasi Hijau Segar */
+            transition: width 0.3s ease;
+        }
+
+        /* 2. Bar di dalam Popup Card */
+        .vital-hp-bar {
+            width: 100%;
+            height: 4px;
+            background: rgba(255,255,255,0.2);
+            border-radius: 2px;
+            margin-top: 4px;
+            overflow: hidden;
+        }
+
+        .vital-hp-fill {
+            width: 100%;
+            height: 100%;
+            background: #e74c3c; /* Merah Nyawa */
+            box-shadow: 0 0 4px #c0392b;
+        }
+
+        .battle-list-container {
+            max-height: 400px;
+            overflow-y: auto;
+            background: rgba(0,0,0,0.2);
+            border-radius: 6px;
+            padding: 8px;
+        }
+
+        .battle-item {
+            display: flex;
+            align-items: center;
+            background: var(--color-surface);
+            border: 1px solid var(--color-border);
+            padding: 8px 12px;
+            margin-bottom: 6px;
+            border-radius: 4px;
+            transition: background 0.2s;
+        }
+
+        .battle-item:hover {
+            background: var(--color-secondary);
+            border-color: var(--color-primary);
+        }
+
+        /* Icon kecil di sebelah nama */
+        .battle-item-icon {
+            width: 32px; height: 32px;
+            border-radius: 50%;
+            overflow: hidden;
+            margin-right: 12px;
+            border: 1px solid #666;
+            flex-shrink: 0;
+            display: flex; justify-content: center; align-items: center;
+            background: #000;
+        }
+        .battle-item-icon img { width: 100%; height: 100%; object-fit: cover; }
+
+        .battle-item-name {
+            font-weight: bold;
+            color: var(--color-text);
+            font-size: 14px;
+        }
+
+        .floating-panel {
+            position: fixed;
+            top: 100px; 
+            right: 20px;
+            left: auto;
+            width: 300px;
+            
+            background: rgba(20, 20, 20, 0.95);
+            border: 1px solid var(--color-primary);
+            border-radius: 8px;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+            z-index: 1000; 
+            display: flex; flex-direction: column;
+            backdrop-filter: blur(10px);
+            
+            /* ANIMASI MUNCUL (Sama kayak Character Popup) */
+            visibility: hidden;
+            opacity: 0;
+            transform: translateY(-20px) scale(0.95); /* Muncul dari atas dikit */
+            transition: 
+                opacity 0.2s ease,
+                transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275),
+                visibility 0.2s;
+        }
+
+        /* Class active buat memunculkan */
+        .floating-panel.active {
+            visibility: visible;
+            opacity: 1;
+            transform: translateY(0) scale(1);
+        }
+
+        .floating-panel.minimized .panel-body {
+            display: block; /* JANGAN display:none, nanti animasinya mati! */
+            max-height: 0;  /* Tinggi jadi 0 */
+            opacity: 0;
+            padding: 0 10px; /* Padding atas-bawah dibuang, kiri-kanan sisa dikit gpp */
+            pointer-events: none;
+        }
+
+        .panel-header {
+            padding: 10px 12px;
+            background: linear-gradient(90deg, rgba(139, 69, 19, 0.4), rgba(0,0,0,0));
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+            color: var(--color-primary);
+            font-weight: bold;
+            font-size: 14px;
+            cursor: move; /* Kursor berubah jadi tanda panah 4 arah */
+            display: flex; justify-content: space-between; align-items: center;
+            user-select: none;
+        }
+
+        .panel-controls { display: flex; gap: 8px; }
+
+        .icon-btn {
+            background: none; border: none; color: #aaa;
+            cursor: pointer; font-weight: bold; padding: 0 4px;
+        }
+        .icon-btn:hover { color: white; }
+        .icon-btn.close-btn:hover { color: #c0392b; }
+
+        .panel-body {
+            /* Set tinggi maksimal yang kira-kira cukup buat nampung list panjang */
+            max-height: 600px; 
+            opacity: 1;
+            padding: 10px;
+            overflow: hidden; /* Wajib hidden biar isinya kepotong pas nutup */
+            transform-origin: top;
+            
+            /* Transisi tinggi dan padding */
+            transition: 
+                max-height 0.4s cubic-bezier(0.25, 1, 0.5, 1),
+                opacity 0.3s ease,
+                padding 0.3s ease;
+        }
+        
+        .battle-list-container {
+            max-height: 300px; overflow-y: auto;
+            margin-bottom: 10px;
+            background: rgba(0,0,0,0.3); border-radius: 4px;
+        }
+
+        .panel-footer {
+            display: flex; gap: 8px; justify-content: space-between;
+            padding-top: 8px; border-top: 1px solid rgba(255,255,255,0.1);
+        }
+
+        .btn-sm { font-size: 11px; padding: 4px 8px; height: auto; }
+
+        .init-input {
+            width: 45px;
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid var(--color-border);
+            color: #2ecc71; /* Warna hijau biar beda sama monster */
+            text-align: center;
+            border-radius: 4px;
+            font-weight: bold;
+            font-size: 14px;
+            padding: 2px;
+        }
+
+        .init-input:focus {
+            outline: none;
+            border-color: var(--color-primary);
+            background: rgba(0, 0, 0, 0.3);
+        }
+
+        .hp-controls {
+            display: inline-flex;
+            gap: 2px;
+            margin-left: 6px;
+            vertical-align: middle;
+        }
+
+        .btn-mini-hp {
+            width: 18px; height: 18px;
+            border: none; border-radius: 3px;
+            color: white; font-weight: bold; font-size: 12px;
+            cursor: pointer; display: flex; align-items: center; justify-content: center;
+            transition: transform 0.1s;
+        }
+        .btn-mini-hp:active { transform: scale(0.9); }
+
+        .btn-heal { background: #2ecc71; border: 1px solid #27ae60; }
+        .btn-heal:hover { background: #27ae60; }
+
+        .btn-dmg { background: #e74c3c; border: 1px solid #c0392b; }
+        .btn-dmg:hover { background: #c0392b; }
+
+        /* Scrollbar tipis biar cantik */
+        .section-content::-webkit-scrollbar { width: 6px; }
+        .section-content::-webkit-scrollbar-thumb { background: var(--color-primary); border-radius: 3px; }
+        .section-content::-webkit-scrollbar-track { background: rgba(0,0,0,0.1); }
+
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <div class="header-group">
+                <span style="font-size: 28px; filter: drop-shadow(0 0 5px var(--color-primary));">🗺️</span>
+                <h1>Dakons</h1>
+            </div>
+
+            <div class="header-group">
+                <button class="btn btn-secondary" id="uploadBtn" title="Upload New Map">
+                    📁 <span class="btn-text">Upload</span>
+                </button>
+                <div class="divider"></div>
+                <button class="btn btn-primary" id="saveBtn" title="Save Project">
+                    💾 <span class="btn-text">Save</span>
+                </button>
+                <button class="btn btn-secondary" id="loadBtn" title="Load Project">
+                    📂 <span class="btn-text">Load</span>
+                </button>
+            </div>
+
+            <div class="header-group">
+                <button class="btn btn-secondary btn-icon-only" id="backBtn" disabled title="Go Back Layer">⬅️</button>
+                
+                <div class="divider"></div>
+
+                <button class="btn btn-secondary" id="openBuilderBtn" style="border-color: #2ecc71; color: #2ecc71;" title="Encounter Builder">
+                    ⚔️ <span class="btn-text">Builder</span>
+                </button>
+
+                <button class="btn btn-primary" id="battleBtn" style="background: #c0392b; color: white; border-color: #e74c3c; margin-left: 8px;" title="Start Battle">
+                    ▶️ <span class="btn-text">Battle</span>
+                </button>
+                
+                <div class="divider"></div>
+                
+                <button class="btn btn-secondary btn-icon-only" id="toggleInfoBtn" title="Toggle Sidebar">ℹ️</button>
+                <button class="btn btn-secondary btn-icon-only" id="enterFullscreenBtn" title="Full Screen">📺</button>
+                <button class="btn btn-reset btn-icon-only" id="resetBtn" title="Reset All">🗑️</button>
+            </div>
+        </div>
+
+        <button id="exitFullscreenBtn">Exit Full Screen (ESC)</button>
+
+        <div class="main-content">
+            <div class="sidebar" id="mainSidebar">
+                <h2>Instructions</h2>
+                <div class="upload-zone" id="uploadZone">
+                    <p><strong>Drag an image here</strong></p>
+                </div>
+
+                <button class="btn btn-secondary" id="uploadAltBtn" style="display: none; width: 100%; margin-bottom: 16px;">
+                    + Upload Alternate Image
+                </button>
+
+                <div class="mode-toggle" id="modeToggle" style="display: none;">
+                    <button id="panModeBtn" class="active">🖐️ Pan/Zoom</button>
+                    <button id="pinModeBtn">📍 Place Pin</button>
+                </div>
+                
+                <div id="toolSelectorContainer" style="display: none;">
+                    <p style="font-size:12px; margin-bottom:4px; color:var(--color-text-secondary);">Active Tool:</p>
+                    <div class="tool-selector">
+                        <button class="tool-btn active" data-tool="link">🔗 Link Pin</button>
+                        <button class="tool-btn" data-tool="player">🟢 Player</button>
+                        <button class="tool-btn" data-tool="enemy">🔴 Enemy</button>
+                        <button class="tool-btn" data-tool="npc">🟡 NPC</button>
+                    </div>
+                </div>
+                
+                <div class="grid-controls" id="gridSettings" style="display: none;">
+                    <h3 style="font-size:14px; margin-bottom:8px;">Grid Settings</h3>
+                    <div class="grid-control-row">
+                        <label for="gridToggle">Show Grid</label>
+                        <input type="checkbox" id="gridToggle">
+                    </div>
+                    <div class="grid-control-row">
+                        <label for="gridSize">Size (px)</label>
+                        <input type="number" id="gridSize" class="grid-input" value="35" min="10" max="500">
+                    </div>
+                </div>
+
+                <div class="mode-indicator" id="modeIndicator">
+                    Mode: Upload main image
+                </div>
+
+                <div class="breadcrumb" id="breadcrumb">
+                    <span>Level 0</span>
+                </div>
+
+                <div class="pin-list" id="pinList"></div>
+            </div>
+
+            <div class="image-container" id="imageContainer">
+                <div class="placeholder">
+                    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
+                    </svg>
+                    <p>Upload an image to get started</p>
+                </div>
+            </div>
+
+            <div class="pin-preview" id="pinPreview">
+                <div class="pin-icon"></div>
+            </div>
+
+            <div id="characterPopup" class="char-popup">
+
+            </div>
+
+            <button class="zoom-btn image-switch-btn" id="switchImageBtn" title="Switch between main and alternate image">
+                🔄
+            </button>
+
+            <div class="zoom-controls">
+                <button class="zoom-btn" id="zoomInBtn">+</button>
+                <button class="zoom-btn" id="zoomOutBtn">−</button>
+                <button class="zoom-btn" id="zoomResetBtn">⟲</button>
+            </div>
+        </div>
+        
+            <div class="promo-credit" aria-label="Social media credit">
+                Check out: <a href="https://www.instagram.com/the_perfectdndcollection/" target="_blank" rel="noopener noreferrer">The_perfectDnDcollection</a>
+            </div>
+
+        <div id="battleTracker" class="floating-panel" style="display: none;">
+            <div class="panel-header" id="battleTrackerHeader">
+                <span>⚔️ Battle Tracker</span>
+                <div class="panel-controls">
+                    <button class="icon-btn" onclick="toggleBattleBody()" title="Minimize">_</button>
+                    <button class="icon-btn close-btn" onclick="closeBattleTracker()">✕</button>
+                </div>
+            </div>
+            
+            <div id="battleBody" class="panel-body">
+                <div id="battleList" class="battle-list-container">
+                    </div>
+                
+                <div class="panel-footer">
+                    <button class="btn btn-secondary btn-sm" onclick="rollAllInitiative()">🎲 Roll All</button>
+                    <button class="btn btn-primary btn-sm" onclick="nextTurn()">Next ▶</button>
+                </div>
+            </div>
+        </div>
+        
+        <div class="modal" id="pinNameModal">
+            <div class="modal-content">
+                <h3 id="modalTitle">Pin Name</h3>
+                <input type="text" id="pinNameInput" placeholder="Enter a name...">
+                
+                <div id="sizeInputContainer" style="display:none; margin-bottom: 16px;">
+                    <label style="font-size: 12px; display:block; margin-bottom:4px;">Size (px):</label>
+                    <input type="number" id="pinSizeInput" placeholder="Size (e.g., 50)" value="50">
+                </div>
+
+                <div class="modal-actions">
+                    <button class="btn btn-secondary" onclick="closePinNameModal()">Cancel</button>
+                    <button class="btn btn-primary" onclick="savePinName()">Save</button>
+                </div>
+            </div>
+        </div>
+
+        <div class="modal" id="deleteConfirmModal">
+            <div class="modal-content">
+                <h3>Delete Item</h3>
+                <p>Are you sure you want to delete this?</p>
+                <div class="modal-actions">
+                    <button class="btn btn-secondary" onclick="closeDeleteModal()">Cancel</button>
+                    <button class="btn btn-reset" onclick="confirmDeletePin()">Delete</button>
+                </div>
+            </div>
+        </div>
+
+        <div class="modal" id="playerSelectModal">
+            <div class="modal-content" style="max-width: 500px;">
+                <h3>Select Character</h3>
+                
+                <div class="player-grid" id="playerSavedList">
+                    </div>
+
+                <button class="btn btn-secondary" style="width:100%" onclick="toggleAddPlayerForm()">+ Add New Character</button>
+
+                <div class="add-player-form" id="addPlayerForm">
+                    <div class="section-label">Identity</div>
+                    <div class="form-row">
+                        <div style="flex: 2;">
+                            <input type="text" id="newPlayerName" placeholder="Character Name" style="margin:0;">
+                        </div>
+                        <div style="flex: 1;">
+                            <select id="newPlayerClass" style="margin:0;">
+                                <option value="barbarian">Barbarian</option>
+                                <option value="bard">Bard</option>
+                                <option value="cleric">Cleric</option>
+                                <option value="druid">Druid</option>
+                                <option value="fighter">Fighter</option>
+                                <option value="monk">Monk</option>
+                                <option value="paladin">Paladin</option>
+                                <option value="ranger">Ranger</option>
+                                <option value="rogue">Rogue</option>
+                                <option value="sorcerer">Sorcerer</option>
+                                <option value="warlock">Warlock</option>
+                                <option value="wizard">Wizard</option>
+                            </select>
+                        </div>
+                        <div style="flex: 0.5;">
+                            <input type="number" id="newPlayerLvl" placeholder="Lvl" value="1" title="Level" style="margin:0; text-align:center;">
+                        </div>
+                    </div>
+
+                    <div class="section-label">Ability Scores</div>
+                    <div class="stat-grid-6">
+                        <div class="stat-box"><label>STR</label><input type="number" id="statStr" value="10"></div>
+                        <div class="stat-box"><label>DEX</label><input type="number" id="statDex" value="10"></div>
+                        <div class="stat-box"><label>CON</label><input type="number" id="statCon" value="10"></div>
+                        <div class="stat-box"><label>INT</label><input type="number" id="statInt" value="10"></div>
+                        <div class="stat-box"><label>WIS</label><input type="number" id="statWis" value="10"></div>
+                        <div class="stat-box"><label>CHA</label><input type="number" id="statCha" value="10"></div>
+                    </div>
+
+                    <div class="section-label">Combat Stats</div>
+                    <div class="form-row">
+                        <div class="stat-box" style="flex:1"><label>AC</label><input type="number" id="newPlayerAC" placeholder="10"></div>
+                        <div class="stat-box" style="flex:1"><label>HP</label><input type="number" id="newPlayerHP" placeholder="10"></div>
+                        <div class="stat-box" style="flex:1"><label>SPD</label><input type="number" id="newPlayerSpd" value="30" step="5"></div>
+                        <div class="stat-box" style="flex:1"><label>INIT</label><input type="number" id="newPlayerInit" placeholder="+0"></div>
+                        <div class="stat-box" style="flex:1.5">
+                            <label>Size</label>
+                            <select id="newPlayerSize" style="margin:0; padding:2px; font-size:11px;">
+                                <option value="Small">Small</option>
+                                <option value="Medium" selected>Medium</option>
+                                <option value="Large">Large</option>
+                                <option value="Huge">Huge</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div style="text-align:right; margin-top:12px; border-top:1px solid rgba(255,255,255,0.1); padding-top:8px;">
+                        <button class="btn btn-primary" onclick="saveNewPlayer()" style="width:100%">Save Character</button>
+                    </div>
+                </div>
+
+                <div class="modal-actions" style="margin-top:16px;">
+                    <button class="btn btn-secondary" onclick="closePlayerModal()">Cancel</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <input type="file" id="fileInput" accept="image/*">
+
+    <script>
+        // --- RECEIVER LOGIC (WALKIE TALKIE) ---
+        let lastImportTime = 0;
+        let selectionBox = null;
+        let isSelecting = false;
+        let pendingPlayerPos = { x: 0, y: 0 };
+        // 1. Broadcast Channel (Modern)
+        const broadcast = new BroadcastChannel('dakons_channel');
+        broadcast.onmessage = (event) => {
+            if (event.data && event.data.type === 'IMPORT_ENCOUNTER') {
+                importEncounterData(event.data.data);
+            }
+        };
+
+        // DATABASE ICON KELAS (Taruh di atas)
+        const ICON_FOLDER = 'icons';
+
+        function getIconHTML(type, cls = null) {
+            // 1. Kalau Player & punya Class -> Pakai SVG
+            if (type === 'player' && cls) {
+                // Pastikan nama file di folder huruf kecil semua (barbarian.svg)
+                const filename = `${cls.toLowerCase()}.jpg`;
+
+                return `<img src="${ICON_FOLDER}/${filename}" class="token-img" onerror="this.outerHTML='🛡️'">`; 
+                // Note: 'onerror' itu fallback kalau gambarnya gak ketemu, balik jadi emoji tameng.
+            }
+            
+            // 2. Kalau Enemy -> Emoji Tengkorak
+            if (type === 'enemy') return '💀';
+            
+            // 3. Kalau NPC -> Emoji Chat
+            if (type === 'npc') return '💬';
+            
+            // 4. Default Player tanpa class -> Emoji Pion
+            return '♟️';
+        }
+
+        // 2. Direct Window Message (Offline/Local)
+        window.addEventListener('message', (event) => {
+            if (event.data && event.data.type === 'IMPORT_ENCOUNTER') {
+                importEncounterData(event.data.data);
+            }
+        });
+
+        function importEncounterData(enemies) {
+            const now = Date.now();
+            if (now - lastImportTime < 500) return;
+            lastImportTime = now;
+
+            if (!state.currentImage) {
+                alert("Baka! Upload map dulu sebelum kirim musuh!");
+                return;
+            }
+            
+            const layer = imageContainer.querySelector('.image-inner');
+            // ... (Logic spawnX/spawnY sama seperti sebelumnya) ...
+            let spawnX = 50; let spawnY = 50;
+            if (layer) {
+                const rect = layer.getBoundingClientRect();
+                const viewportCenterX = window.innerWidth / 2;
+                const viewportCenterY = window.innerHeight / 2;
+                const relX = viewportCenterX - rect.left;
+                const relY = viewportCenterY - rect.top;
+                spawnX = (relX / rect.width) * 100;
+                spawnY = (relY / rect.height) * 100;
+                spawnX = Math.max(5, Math.min(95, spawnX));
+                spawnY = Math.max(5, Math.min(95, spawnY));
+            }
+            
+            let added = 0;
+            
+            enemies.forEach(m => {
+                const count = m.qty || 1; 
+
+                for (let i = 0; i < count; i++) {
+                    const baseName = m.name || m.Name || 'Unknown';
+                    const existingTokens = state.currentImage.tokens.filter(t => {
+                        return t.name === baseName || t.name.match(new RegExp(`^${baseName} \\d+$`));
+                    });
+
+                    let finalName = baseName;
+                    if (existingTokens.length > 0) {
+                        finalName = `${baseName} ${existingTokens.length + 1}`;
+                    }
+
+                    const offsetX = (Math.random() - 0.5) * 5; 
+                    const offsetY = (Math.random() - 0.5) * 5;
+                    
+                    let monsterScale = 1;
+                    if(m.size || m.Size) {
+                        monsterScale = getMonsterScale(m.size || m.Size);
+                    }
+
+                    // [FIX UTAMA DISINI] 🛠️
+                    const monsterStats = {
+                        // 1. HP: Ambil rata-rata (hpAvg) dulu. Kalau gak ada, baru coba parse rumus (m.hp).
+                        hp: m.hpAvg || parseInt(m.hp) || 10,
+                        
+                        // 2. AC: Ambil nilai AC
+                        ac: m.ac || 10,
+                        
+                        // 3. INIT: Ambil 'm.init' (dari Builder) BUKAN 'm.initiative'. 
+                        // ParseInt biar "+2" jadi angka 2.
+                        init: parseInt(m.init) || 0,
+                        
+                        speed: m.speed || 30
+                    };
+
+                    state.currentImage.addToken(
+                        spawnX + offsetX, 
+                        spawnY + offsetY, 
+                        'enemy', 
+                        finalName, 
+                        null,         
+                        monsterScale, 
+                        monsterStats  // <--- Data yang sudah diperbaiki
+                    );
+                    
+                    added++;
+                }
+            });
+            
+            renderImage();
+            alert(`Diterima! ${added} musuh mendarat.`);
+            
+            // Refresh Battle Tracker kalau lagi kebuka
+            if (battleTracker.style.display !== 'none') {
+                refreshBattleList();
+            }
+        }
+
+        // --- EXISTING LOGIC ---
+        
+        const state = {
+            navigationStack: [],
+            currentImage: null,
+            selectedPinId: null,
+            mode: 'add-image',
+            interactionMode: 'pan',
+            activeTool: 'link', 
+            zoom: 1,
+            pendingPinId: null, 
+            pendingType: null, 
+            itemToDelete: null, 
+            showingAltImage: false,
+            panX: 0,
+            panY: 0,
+            isDragging: false,
+            dragStartX: 0,
+            dragStartY: 0,
+            draggingTokenId: null,
+            draggingTokenEl: null,
+            showGrid: false,
+            gridSize: 35,
+            selectedTokens: [],
+            savedPlayers: [],
+            editingTokenId: null,
+            activePopupTokenId: null, 
+            tokenHasMoved: false,
+            currentTurnIndex: -1, // -1 artinya battle belum mulai
+            combatants: []
+        };
+
+        const uploadZone = document.getElementById('uploadZone');
+        const uploadBtn = document.getElementById('uploadBtn');
+        const fileInput = document.getElementById('fileInput');
+        const imageContainer = document.getElementById('imageContainer');
+        const backBtn = document.getElementById('backBtn');
+        const modeIndicator = document.getElementById('modeIndicator');
+        const breadcrumb = document.getElementById('breadcrumb');
+        const pinList = document.getElementById('pinList');
+        const resetBtn = document.getElementById('resetBtn');
+        const zoomInBtn = document.getElementById('zoomInBtn');
+        const zoomOutBtn = document.getElementById('zoomOutBtn');
+        const zoomResetBtn = document.getElementById('zoomResetBtn');
+        const switchImageBtn = document.getElementById('switchImageBtn');
+        const saveBtn = document.getElementById('saveBtn');
+        const uploadAltBtn = document.getElementById('uploadAltBtn');
+        const pinNameModal = document.getElementById('pinNameModal');
+        const pinNameInput = document.getElementById('pinNameInput');
+        const pinSizeInput = document.getElementById('pinSizeInput');
+        const sizeInputContainer = document.getElementById('sizeInputContainer');
+        const deleteConfirmModal = document.getElementById('deleteConfirmModal');
+        const modeToggle = document.getElementById('modeToggle');
+        const panModeBtn = document.getElementById('panModeBtn');
+        const pinModeBtn = document.getElementById('pinModeBtn');
+        const toggleInfoBtn = document.getElementById('toggleInfoBtn');
+        const mainSidebar = document.getElementById('mainSidebar');
+        const enterFullscreenBtn = document.getElementById('enterFullscreenBtn');
+        const exitFullscreenBtn = document.getElementById('exitFullscreenBtn');
+        const toolSelectorContainer = document.getElementById('toolSelectorContainer');
+        const toolBtns = document.querySelectorAll('.tool-btn');
+        const gridSettings = document.getElementById('gridSettings');
+        const gridToggle = document.getElementById('gridToggle');
+        const gridSizeInput = document.getElementById('gridSize');
+        const openBuilderBtn = document.getElementById('openBuilderBtn');
+        const playerSelectModal = document.getElementById('playerSelectModal');
+        const playerSavedList = document.getElementById('playerSavedList');
+        const addPlayerForm = document.getElementById('addPlayerForm');
+
+        class ImageNode {
+            constructor(src, parentPinId = null) {
+                this.id = Date.now() + Math.random();
+                this.src = src;
+                this.altSrc = null;
+                this.pins = []; 
+                this.tokens = []; 
+                this.parentPinId = parentPinId;
+                this.viewState = { x: 0, y: 0, zoom: 1 };
+            }
+
+            addPin(x, y, name = '') {
+                const pin = { id: Date.now() + Math.random(), x, y, name, linkedImage: null };
+                this.pins.push(pin);
+                return pin;
+            }
+
+            addToken(x, y, type, name = '', cls = null, scale = 1, stats = {}) {
+                // Tambahkan property 'stats' ke object token
+                const token = { 
+                    id: Date.now() + Math.random(), 
+                    x, y, type, name, scale, cls, 
+                    stats: stats // <--- Simpan stats di sini!
+                };
+                this.tokens.push(token);
+                return token;
+            }
+        }
+
+        function saveCurrentViewState() {
+            if (state.currentImage) {
+                state.currentImage.viewState = {
+                    x: state.panX,
+                    y: state.panY,
+                    zoom: state.zoom
+                };
+            }
+        }
+
+        function restoreViewState(imageNode) {
+            if (imageNode && imageNode.viewState) {
+                state.panX = imageNode.viewState.x || 0;
+                state.panY = imageNode.viewState.y || 0;
+                state.zoom = imageNode.viewState.zoom || 1;
+            } else {
+                // Default kalau belum pernah dibuka
+                state.panX = 0; state.panY = 0; state.zoom = 1;
+            }
+        }
+
+        function init() { 
+            setupEventListeners();
+            document.documentElement.style.setProperty('--grid-size', state.gridSize + 'px');
+         }
+
+        function getMonsterScale(sizeString) {
+            if (!sizeString) return 1; // Default Medium (1x1)
+            const s = sizeString.toLowerCase();
+            
+            if (s.includes('tiny')) return 0.5;      // Setengah kotak (opsional)
+            if (s.includes('small')) return 0.8;     // Agak kecil dikit
+            if (s.includes('medium')) return 1;      // 1 kotak standard
+            if (s.includes('large')) return 2;       // 2x2 kotak
+            if (s.includes('huge')) return 3;        // 3x3 kotak
+            if (s.includes('gargantuan')) return 4;  // 4x4 kotak
+            
+            return 1; // Default
+        }
+
+        function setupEventListeners() {
+            uploadBtn.addEventListener('click', () => fileInput.click());
+            fileInput.addEventListener('change', handleFileSelect);
+            
+            uploadZone.addEventListener('click', () => fileInput.click());
+            uploadZone.addEventListener('dragover', handleDragOver);
+            uploadZone.addEventListener('dragleave', handleDragLeave);
+            uploadZone.addEventListener('drop', handleDrop);
+
+            backBtn.addEventListener('click', navigateBack);
+            resetBtn.addEventListener('click', resetApp);
+
+            zoomInBtn.addEventListener('click', () => setZoom(state.zoom + 0.2));
+            zoomOutBtn.addEventListener('click', () => setZoom(state.zoom - 0.2));
+            zoomResetBtn.addEventListener('click', () => setZoom(1));
+
+            switchImageBtn.addEventListener('click', toggleAltImage);
+            uploadAltBtn.addEventListener('click', uploadAltImage);
+            saveBtn.addEventListener('click', saveToFile);
+            document.getElementById('loadBtn').addEventListener('click', loadFromFile);
+
+            panModeBtn.addEventListener('click', () => setInteractionMode('pan'));
+            pinModeBtn.addEventListener('click', () => setInteractionMode('pin'));
+
+            toggleInfoBtn.addEventListener('click', () => { mainSidebar.classList.toggle('hidden'); });
+            
+            enterFullscreenBtn.addEventListener('click', toggleFullscreen);
+            exitFullscreenBtn.addEventListener('click', toggleFullscreen);
+            
+            document.addEventListener('keydown', (e) => {
+                if (e.key === 'Escape' && document.body.classList.contains('fullscreen-mode')) {
+                    toggleFullscreen();
+                }
+            });
+
+            toolBtns.forEach(btn => {
+                btn.addEventListener('click', () => {
+                    toolBtns.forEach(b => b.classList.remove('active'));
+                    btn.classList.add('active');
+                    state.activeTool = btn.dataset.tool;
+                });
+            });
+
+            gridToggle.addEventListener('change', (e) => {
+                state.showGrid = e.target.checked;
+                updateGrid();
+            });
+            gridSizeInput.addEventListener('input', (e) => {
+                const val = parseInt(e.target.value) || 35;
+                state.gridSize = val;
+                
+                // MAGIC HAPPENS HERE: Update variabel global CSS
+                document.documentElement.style.setProperty('--grid-size', val + 'px');
+                
+                updateGrid();
+            });
+
+            imageContainer.addEventListener('click', handleImageClick);
+            imageContainer.addEventListener('wheel', handleWheelZoom, { passive: false });
+            
+            imageContainer.addEventListener('mousedown', handleMouseDown);
+            document.addEventListener('mousemove', handleMouseMove);
+            document.addEventListener('mouseup', handleMouseUp);
+
+            document.addEventListener('mousemove', (e) => {
+                state.lastMouseX = e.clientX;
+                state.lastMouseY = e.clientY;
+                updatePinPreview(e);
+            });
+
+            // --- TAMBAHAN: KEYBOARD DELETE SHORTCUT ---
+            // --- UPDATE KEYBOARD SHORTCUTS ---
+            document.addEventListener('keydown', (e) => {
+                // Jangan jalan kalau lagi ngetik di input teks
+                if (e.target.tagName === 'INPUT') return;
+
+                const key = e.key.toLowerCase();
+
+                // 1. DELETE ITEMS (Delete / Backspace)
+                if (e.key === 'Delete' || e.key === 'Backspace') {
+                    if (state.selectedTokens && state.selectedTokens.length > 0) {
+                        state.itemToDelete = { id: 'BATCH', type: 'batch' }; 
+                        document.querySelector('#deleteConfirmModal p').textContent = `Hapus ${state.selectedTokens.length} item terpilih?`;
+                        deleteConfirmModal.classList.add('active');
+                    }
+                    return; // Stop biar gak trigger fungsi 'Back' browser
+                }
+
+                // 2. TOGGLE FULLSCREEN (F)
+                if (key === 'f') {
+                    toggleFullscreen();
+                }
+
+                // 3. TOGGLE SIDEBAR (I)
+                if (key === 'i') {
+                    mainSidebar.classList.toggle('hidden');
+                }
+
+                // 4. GO BACK LAYER (B)
+                if (key === 'b') {
+                    if (!backBtn.disabled) navigateBack();
+                }
+
+                // 5. SWITCH MODE (M atau Space)
+                if (key === 'm' || e.key === ' ') {
+                    e.preventDefault(); // Biar gak scroll ke bawah kalau tekan Spasi
+                    
+                    // Toggle logika
+                    if (state.interactionMode === 'pan') {
+                        setInteractionMode('pin');
+                    } else {
+                        setInteractionMode('pan');
+                    }
+                }
+
+                // 6. EXIT FULLSCREEN (Escape)
+                if (e.key === 'Escape') {
+                    if (document.body.classList.contains('fullscreen-mode')) {
+                        toggleFullscreen();
+                    }
+                    // Tutup modal kalau ada yang aktif
+                    closePinNameModal();
+                    closeDeleteModal();
+                    closePlayerModal();
+                }
+
+                if (key === 'g') {
+                    // Toggle status
+                    state.showGrid = !state.showGrid;
+                    
+                    // Update Checkbox di Sidebar (biar sinkron kalau sidebar dibuka)
+                    if(gridToggle) gridToggle.checked = state.showGrid;
+                    
+                    // Render ulang gridnya
+                    updateGrid();
+                }
+            });
+
+            // --- BUILDER BUTTON ---
+            if(openBuilderBtn) {
+                openBuilderBtn.addEventListener('click', () => {
+                    window.open('DAKONS_Encounter_Builder.html', 'DakonsBuilder', 'width=1000,height=800');
+                });
+            }
+
+            document.addEventListener('mousedown', (e) => {
+                // 1. Kalau yang diklik adalah Popup itu sendiri, JANGAN tutup
+                if (e.target.closest('.char-popup')) return;
+                
+                // 2. Kalau yang diklik adalah Token, JANGAN tutup (biar logic token yang ngurus)
+                if (e.target.closest('.token')) return;
+
+                // 3. Selain itu (klik tanah, sidebar, dll), TUTUP POPUP SEKARANG!
+                closeCharacterPopup();
+            });
+
+            makeDraggable(document.getElementById("battleTracker"));
+            const btnBattle = document.getElementById('battleBtn');
+            if(btnBattle) btnBattle.addEventListener('click', openBattleTracker);
+            if(btnBattle) btnBattle.onclick = openBattleTracker;
+
+            
+            
+        }
+        
+        function updateGrid() {
+            const gridOverlay = document.querySelector('.grid-overlay');
+            if (gridOverlay) {
+                if (state.showGrid) {
+                    gridOverlay.classList.add('active');
+                    gridOverlay.style.backgroundSize = `${state.gridSize}px ${state.gridSize}px`;
+                } else {
+                    gridOverlay.classList.remove('active');
+                }
+            }
+        }
+
+        function toggleFullscreen() { document.body.classList.toggle('fullscreen-mode'); }
+
+        function updatePinPreview(e) {
+            const pinPreview = document.getElementById('pinPreview');
+            if (!pinPreview) return;
+            
+            if (state.isDragging || state.draggingTokenId) {
+                pinPreview.classList.remove('active');
+                return;
+            }
+
+            if (state.mode === 'add-pin' && state.interactionMode === 'pin' && state.currentImage) {
+                const img = imageContainer.querySelector('.main-image');
+                if (img) {
+                    const imgRect = img.getBoundingClientRect();
+                    if (e.clientX >= imgRect.left && e.clientX <= imgRect.right && 
+                        e.clientY >= imgRect.top && e.clientY <= imgRect.bottom) {
+                        
+                        pinPreview.classList.add('active');
+                        pinPreview.style.left = e.clientX + 'px';
+                        pinPreview.style.top = e.clientY + 'px';
+                        
+                        const icon = pinPreview.querySelector('.pin-icon');
+                        icon.style.transform = ''; icon.style.borderRadius = '';
+                        icon.style.backgroundColor = ''; icon.style.borderColor = '';
+
+                        if (state.activeTool === 'link') {
+                            icon.style.transform = 'rotate(-45deg)';
+                            icon.style.borderRadius = '50% 50% 50% 0';
+                            icon.style.backgroundColor = 'var(--color-primary)';
+                            icon.style.borderColor = '#1a1a1a';
+                        } else {
+                            icon.style.borderRadius = '50%';
+                            if (state.activeTool === 'player') icon.style.backgroundColor = '#2ecc71';
+                            else if (state.activeTool === 'enemy') icon.style.backgroundColor = '#e74c3c';
+                            else if (state.activeTool === 'npc') icon.style.backgroundColor = '#f1c40f';
+                        }
+                        return;
+                    }
+                }
+            }
+            pinPreview.classList.remove('active');
+        }
+
+        function handleFileSelect(e) {
+            const file = e.target.files[0];
+            if (file && file.type.startsWith('image/')) loadImage(file);
+            fileInput.value = '';
+        }
+
+        function handleDragOver(e) { e.preventDefault(); uploadZone.classList.add('dragover'); }
+        function handleDragLeave(e) { e.preventDefault(); uploadZone.classList.remove('dragover'); }
+        function handleDrop(e) {
+            e.preventDefault(); uploadZone.classList.remove('dragover');
+            const file = e.dataTransfer.files[0];
+            if (file && file.type.startsWith('image/')) loadImage(file);
+        }
+
+        function loadImage(file, isAltImage = false) {
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                const imageSrc = e.target.result;
+                
+                if (isAltImage && state.currentImage) {
+                    state.currentImage.altSrc = imageSrc;
+                    renderImage();
+                } else if (state.mode === 'add-image' && state.selectedPinId === null) {
+                    const imageNode = new ImageNode(imageSrc);
+                    state.navigationStack = [imageNode];
+                    state.currentImage = imageNode;
+                    state.mode = 'add-pin';
+                    renderImage();
+                } else if (state.mode === 'add-image' && state.selectedPinId !== null) {
+                    const pin = findPinById(state.currentImage, state.selectedPinId);
+                    if (pin) {
+                        const imageNode = new ImageNode(imageSrc, state.selectedPinId);
+                        pin.linkedImage = imageNode;
+                        state.selectedPinId = null;
+                        state.mode = 'add-pin';
+                        renderImage();
+                    }
+                }
+            };
+            reader.readAsDataURL(file);
+        }
+
+        function uploadAltImage() {
+            const input = document.createElement('input');
+            input.type = 'file';
+            input.accept = 'image/*';
+            input.onchange = (e) => {
+                const file = e.target.files[0];
+                if (file && file.type.startsWith('image/')) loadImage(file, true);
+            };
+            input.click();
+        }
+
+        // 1. Update handleImageClick (Ganti logic 'player' doang)
+        function handleImageClick(e) {
+            if (state.isDragging || state.draggingTokenId || state.isResizing) return;
+            
+            // [PENTING] Tutup popup kalau klik tanah
+            closeCharacterPopup();
+
+            if (e.target.closest('.pin') || e.target.closest('.token')) return;
+            if (state.mode !== 'add-pin' || !state.currentImage) return;
+            if (state.interactionMode !== 'pin') return;
+
+            const layer = imageContainer.querySelector('.image-inner');
+            if (!layer) return;
+            const rect = layer.getBoundingClientRect();
+            if (e.clientX < rect.left || e.clientX > rect.right || e.clientY < rect.top || e.clientY > rect.bottom) return;
+            const x = ((e.clientX - rect.left) / rect.width) * 100;
+            const y = ((e.clientY - rect.top) / rect.height) * 100;
+
+            if (state.activeTool === 'player') {
+                pendingPlayerPos = { x, y };
+                openPlayerModal();
+            } else if (state.activeTool === 'link') {
+                const pin = state.currentImage.addPin(x, y);
+                state.pendingPinId = pin.id; state.pendingType = 'pin';
+                document.getElementById('modalTitle').textContent = 'Pin Name'; openPinNameModal();
+            } else {
+                const token = state.currentImage.addToken(x, y, state.activeTool);
+                state.pendingPinId = token.id; state.pendingType = 'token';
+                document.getElementById('modalTitle').textContent = 'Name & Size'; openPinNameModal();
+            }
+        }
+
+        function renderImage() {
+            if (!state.currentImage) return;
+
+            const imageSrc = (state.showingAltImage && state.currentImage.altSrc) 
+                ? state.currentImage.altSrc 
+                : state.currentImage.src;
+
+            imageContainer.innerHTML = `
+                <div class="image-wrapper" style="transform: translate(${state.panX}px, ${state.panY}px) scale(${state.zoom}); transform-origin: center;">
+                    <div class="image-inner">
+                        <img src="${imageSrc}" class="main-image" alt="Image">
+                        <div class="grid-overlay"></div>
+                        ${renderPins()}
+                        ${renderTokens()}
+                    </div>
+                </div>
+            `;
+            
+            updateGrid();
+            updateUI();
+        }
+
+        // --- 1. HELPER MODIFIER ---
+        function getAbilityMod(score) {
+            if (!score) return 0;
+            return Math.floor((score - 10) / 2);
+        }
+        function formatMod(mod) {
+            return mod >= 0 ? `+${mod}` : mod;
+        }
+
+        // --- 2. LOGIC POPUP BUBBLE ---
+
+        function closeCharacterPopup() {
+            document.getElementById('characterPopup').classList.remove('active');
+        }
+
+        function renderPins() {
+            return state.currentImage.pins.map(pin => `
+                <div class="pin" style="left: ${pin.x}%; top: ${pin.y}%;" data-pin-id="${pin.id}" data-name="${pin.name}">
+                    <div class="pin-icon"></div>
+                </div>
+            `).join('');
+        }
+
+        function renderTokens() {
+            return state.currentImage.tokens.map(token => {
+                const isSelected = state.selectedTokens.includes(token.id) ? 'selected' : '';
+                
+                // Konversi Scale Legacy (biar save lama gak rusak)
+                let currentScale = token.scale || 1;
+                if (!token.scale && token.size) {
+                    currentScale = token.size / 35;
+                }
+
+                // --- LOGIC BARU PAKAI HELPER ---
+                const iconContent = getIconHTML(token.type, token.cls);
+
+                return `
+                <div class="token token-${token.type} ${isSelected}" 
+                        style="left: ${token.x}%; top: ${token.y}%; --scale: ${currentScale};" 
+                        data-token-id="${token.id}" 
+                        data-name="${token.name}">
+                    
+                    <div class="token-icon">
+                        ${iconContent}
+                    </div>
+
+                    ${ (token.type === 'player') ? `
+                    <div class="token-hp-bar">
+                        <div class="token-hp-fill" style="width: 100%;"></div>
+                    </div>
+                    ` : '' }
+
+                </div>
+            `}).join('');
+        }
+
+        function updateUI() {
+            backBtn.disabled = state.navigationStack.length <= 1;
+
+            if (state.currentImage && state.currentImage.altSrc) {
+                switchImageBtn.classList.add('visible');
+                switchImageBtn.title = state.showingAltImage ? 'Switch to main image' : 'Switch to alternate image';
+            } else {
+                switchImageBtn.classList.remove('visible');
+            }
+
+            if (state.currentImage && state.mode === 'add-pin') {
+                uploadAltBtn.style.display = 'block';
+                uploadAltBtn.textContent = state.currentImage.altSrc ? '✏️ Change Alternate Image' : '+ Upload Alternate Image';
+                modeToggle.style.display = 'flex';
+                toolSelectorContainer.style.display = state.interactionMode === 'pin' ? 'block' : 'none';
+                gridSettings.style.display = 'block';
+            } else {
+                uploadAltBtn.style.display = 'none';
+                modeToggle.style.display = 'none';
+                toolSelectorContainer.style.display = 'none';
+                gridSettings.style.display = 'none';
+            }
+
+            if (state.mode === 'add-image') {
+                modeIndicator.textContent = state.selectedPinId ? 'Mode: Upload image for selected pin' : 'Mode: Upload main image';
+            } else {
+                modeIndicator.textContent = state.interactionMode === 'pin' ? 'Mode: Click map to place items' : 'Mode: Drag to pan';
+            }
+
+            breadcrumb.innerHTML = `<span>Level ${state.navigationStack.length - 1} | Zoom: ${Math.round(state.zoom * 100)}%</span>`;
+
+            // ... (Bagian atas updateUI biarin aja, mulai GANTI dari sini) ...
+
+            // --- LIST PINS & TOKENS (ACCORDION STYLE) ---
+            let listHtml = '';
+
+            // 1. RENDER PINS LIST
+            if (state.currentImage && state.currentImage.pins.length > 0) {
+                const count = state.currentImage.pins.length;
+                listHtml += `
+                    <div class="section-header" onclick="toggleSection('pinSection')">
+                        <span>📍 Navigation Pins (${count})</span>
+                        <span id="pinSectionArrow">▼</span>
+                    </div>
+                    <div class="section-content" id="pinSection">
+                `;
+                
+                listHtml += state.currentImage.tokens.map((token) => {
+                    const icon = getIconHTML(token.type, token.cls);
+                    
+                    // Ambil info AC/HP buat preview
+                    const ac = token.stats ? token.stats.ac : (token.ac || '-');
+
+                    return `
+                    <div class="pin-item">
+                        <div class="pin-item-info" style="display:flex; align-items:center;">
+                            <div class="list-icon-wrapper">
+                                ${icon}
+                            </div>
+                            
+                            <div>
+                                <div style="font-weight:bold;">${token.name}</div>
+                                <div style="font-size:10px; color:#888;">
+                                    Size: ${token.size||'Med'} | AC: ${ac}
+                                </div>
+                            </div>
+                        </div>
+                        <div class="pin-item-actions">
+                            <button onclick="openEditTokenMode('${token.id}')">✏️</button>
+                            <button class="delete-btn" onclick="openDeleteModal('${token.id}', 'token')">🗑️</button>
+                        </div>
+                    </div>
+                `}).join('');
+                
+                listHtml += `</div>`; // Tutup div section
+            }
+
+            // 2. RENDER CHARACTERS LIST
+            if (state.currentImage && state.currentImage.tokens.length > 0) {
+                const count = state.currentImage.tokens.length;
+                listHtml += `
+                    <div class="section-header" onclick="toggleSection('tokenSection')">
+                        <span>👥 Characters (${count})</span>
+                        <span id="tokenSectionArrow">▼</span>
+                    </div>
+                    <div class="section-content" id="tokenSection">
+                `;
+                
+                listHtml += state.currentImage.tokens.map((token) => {
+                    // [FIX ERROR DISINI]
+                    // Jangan pakai CLASS_ICONS lagi, dia sudah almarhum!
+                    // Pakai getIconHTML biar gambarnya muncul beneran (JPG/PNG).
+                    const icon = getIconHTML(token.type, token.cls);
+
+                    return `
+                    <div class="pin-item">
+                        <div class="pin-item-info">
+                            <span style="display:inline-flex; align-items:center; justify-content:center; width:24px; height:24px; margin-right:4px; overflow:hidden; border-radius:50%;">
+                                ${icon}
+                            </span>
+                            <span>${token.name}</span>
+                            <span style="font-size:10px; color:#888; margin-left:4px;">(${token.size||35}px)</span>
+                        </div>
+                        <div class="pin-item-actions">
+                            <button onclick="openEditTokenMode('${token.id}')">✏️</button>
+                            <button class="delete-btn" onclick="openDeleteModal('${token.id}', 'token')">🗑️</button>
+                        </div>
+                    </div>
+                `}).join('');
+                
+                listHtml += `</div>`; // Tutup div section
+            }
+            
+            pinList.innerHTML = listHtml;
+
+            // ... (Sisa event listener di bawah biarin aja, atau copy paste ulang kalau takut salah) ...
+            // Setup click handlers for pins/tokens in the list/map
+            document.querySelectorAll('.pin').forEach(el => {
+                el.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    handlePinClick(parseFloat(el.dataset.pinId));
+                });
+            });
+            
+            document.querySelectorAll('.token').forEach(el => {
+                el.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    if(!state.draggingTokenId) {
+                        showCharacterPopup(parseFloat(el.dataset.tokenId));
+                    }
+                });
+            });
+        }
+
+        function handlePinClick(pinId) {
+            const pin = findPinById(state.currentImage, pinId);
+            if (!pin) return;
+
+            if (pin.linkedImage) {
+                // 1. Simpan posisi map SAAT INI dulu
+                saveCurrentViewState();
+
+                state.navigationStack.push(pin.linkedImage);
+                state.currentImage = pin.linkedImage;
+
+                // 2. Load posisi map BARU
+                restoreViewState(state.currentImage);
+                
+                renderImage();
+            } else {
+                state.selectedPinId = pinId;
+                state.mode = 'add-image';
+                updateUI();
+            }
+        }
+        
+        function handlePinAction(pinId) {
+            handlePinClick(parseFloat(pinId));
+        }
+
+        function navigateBack() {
+            if (state.navigationStack.length > 1) {
+                // 1. Simpan posisi map ANAK sebelum ditinggal
+                saveCurrentViewState();
+
+                state.navigationStack.pop();
+                state.currentImage = state.navigationStack[state.navigationStack.length - 1];
+                
+                // 2. Load posisi map INDUK
+                restoreViewState(state.currentImage);
+
+                state.mode = 'add-pin';
+                state.selectedPinId = null;
+                state.showingAltImage = false;
+                renderImage();
+            }
+        }
+
+        function findPinById(imageNode, pinId) {
+            return imageNode.pins.find(p => p.id === pinId);
+        }
+        
+        function findTokenById(imageNode, tokenId) {
+            return imageNode.tokens.find(t => t.id === tokenId);
+        }
+
+        function setZoom(newZoom) {
+            state.zoom = Math.max(0.5, Math.min(3, newZoom));
+            renderImage();
+            
+            // [PENTING] Update posisi popup pas zoom
+            updatePopupPosition();
+        }
+
+        function handleWheelZoom(e) {
+            if (state.mode !== 'add-pin' || !state.currentImage) return;
+            e.preventDefault();
+            const zoomFactor = Math.exp(-e.deltaY * 0.002);
+            setZoom(state.zoom * zoomFactor);
+        }
+
+        // --- MOUSE HANDLERS (Manual Drag + Pan + Resize Logic Manual) ---
+
+        // --- UPDATE MOUSE HANDLERS (SELECTION + DRAG + PAN) ---
+
+        function handleMouseDown(e) {
+            // 1. LOGIC SELECTION BOX (Shift + Klik di area kosong)
+            if (e.shiftKey && !e.target.closest('.token') && !e.target.closest('.pin')) {
+                e.preventDefault();
+                isSelecting = true;
+                
+                if (!selectionBox) {
+                    selectionBox = document.createElement('div');
+                    selectionBox.className = 'selection-box';
+                    document.body.appendChild(selectionBox);
+                }
+                
+                state.selectionStartX = e.clientX;
+                state.selectionStartY = e.clientY;
+                
+                selectionBox.style.left = e.clientX + 'px';
+                selectionBox.style.top = e.clientY + 'px';
+                selectionBox.style.width = '0px';
+                selectionBox.style.height = '0px';
+                selectionBox.style.display = 'block';
+                
+                if (!e.ctrlKey) {
+                    state.selectedTokens = [];
+                    renderImage(); 
+                }
+                return;
+            }
+
+            // 2. LOGIC TOKEN DRAG & CLICK (PERBAIKAN DISINI)
+            const tokenEl = e.target.closest('.token');
+            if (tokenEl) {
+                e.preventDefault();
+                e.stopPropagation();
+                const tokenId = parseFloat(tokenEl.dataset.tokenId);
+
+                // Selection Logic
+                if (!state.selectedTokens.includes(tokenId)) {
+                    if (!e.shiftKey && !e.ctrlKey) state.selectedTokens = [tokenId];
+                    else state.selectedTokens.push(tokenId);
+                    renderImage(); 
+                }
+                
+                // Siapkan Dragging, TAPI JANGAN AKTIFKAN DULU
+                state.draggingTokenId = tokenId;
+                state.draggingTokenEl = tokenEl;
+                state.tokenHasMoved = false; // <--- Flag Baru: Belum gerak
+                
+                // [HAPUS] tokenEl.classList.add('dragging'); <- Kita pindah ke MouseMove
+                return;
+            }
+
+            // Cek Pin
+            if (e.target.closest('.pin')) return; 
+
+            // 3. LOGIC PAN
+            if (state.interactionMode === 'pan') {
+                if (!e.shiftKey && !e.ctrlKey) {
+                    state.selectedTokens = [];
+                    renderImage(); 
+                }
+                state.isDragging = true;
+                state.dragStartX = e.clientX - state.panX;
+                state.dragStartY = e.clientY - state.panY;
+                const wrapper = imageContainer.querySelector('.image-wrapper');
+                if (wrapper) wrapper.classList.add('dragging');
+                e.preventDefault();
+            }
+        }
+
+        function handleMouseMove(e) {
+            // A. LOGIC SELECTION BOX
+            if (isSelecting && selectionBox) {
+                e.preventDefault();
+                const currentX = e.clientX;
+                const currentY = e.clientY;
+                const width = Math.abs(currentX - state.selectionStartX);
+                const height = Math.abs(currentY - state.selectionStartY);
+                const left = Math.min(currentX, state.selectionStartX);
+                const top = Math.min(currentY, state.selectionStartY);
+                
+                selectionBox.style.width = width + 'px';
+                selectionBox.style.height = height + 'px';
+                selectionBox.style.left = left + 'px';
+                selectionBox.style.top = top + 'px';
+                return;
+            }
+
+            // B. LOGIC DRAG TOKEN
+            if (state.draggingTokenId) {
+                e.preventDefault();
+                if (!state.tokenHasMoved) {
+                    state.tokenHasMoved = true;
+                    if(state.draggingTokenEl) state.draggingTokenEl.classList.add('dragging');
+                }
+
+                const layer = imageContainer.querySelector('.image-inner');
+                if (!layer) return;
+                const rect = layer.getBoundingClientRect();
+                
+                let newX = ((e.clientX - rect.left) / rect.width) * 100;
+                let newY = ((e.clientY - rect.top) / rect.height) * 100;
+                newX = Math.max(0, Math.min(100, newX));
+                newY = Math.max(0, Math.min(100, newY));
+
+                const mainTokenData = findTokenById(state.currentImage, state.draggingTokenId);
+                if (mainTokenData) {
+                    const deltaX = newX - mainTokenData.x;
+                    const deltaY = newY - mainTokenData.y;
+                    state.selectedTokens.forEach(id => {
+                        const tData = findTokenById(state.currentImage, id);
+                        const tEl = document.querySelector(`.token[data-token-id="${id}"]`);
+                        if (tData && tEl) {
+                            let targetX = tData.x + deltaX;
+                            let targetY = tData.y + deltaY;
+                            tEl.style.left = `${targetX}%`;
+                            tEl.style.top = `${targetY}%`;
+                        }
+                    });
+                }
+                
+                // [PENTING] Update posisi popup kalau token yang lagi dibuka ikut kegeser
+                if (state.activePopupTokenId) updatePopupPosition();
+
+                return;
+            }
+
+            // C. LOGIC PAN (GESER MAP)
+            if (state.isDragging) {
+                e.preventDefault();
+                state.panX = e.clientX - state.dragStartX;
+                state.panY = e.clientY - state.dragStartY;
+                const wrapper = imageContainer.querySelector('.image-wrapper');
+                if (wrapper) {
+                    wrapper.style.transform = `translate(${state.panX}px, ${state.panY}px) scale(${state.zoom})`;
+                    
+                    // [PENTING] Update posisi popup biar ngikut map!
+                    updatePopupPosition(); 
+                }
+            }
+            
+            state.lastMouseX = e.clientX;
+            state.lastMouseY = e.clientY;
+            updatePinPreview(e);
+        }
+
+        function handleMouseUp(e) {
+            // 1. Finalize Selection Box
+            if (isSelecting) {
+                isSelecting = false;
+                if (selectionBox) {
+                    const selRect = selectionBox.getBoundingClientRect();
+                    const tokens = document.querySelectorAll('.token');
+                    const newSelection = [];
+                    tokens.forEach(tok => {
+                        const tokRect = tok.getBoundingClientRect();
+                        if (selRect.left < tokRect.right && selRect.right > tokRect.left &&
+                            selRect.top < tokRect.bottom && selRect.bottom > tokRect.top) {
+                            newSelection.push(parseFloat(tok.dataset.tokenId));
+                        }
+                    });
+                    
+                    if (e.ctrlKey) {
+                        state.selectedTokens = [...new Set([...state.selectedTokens, ...newSelection])];
+                    } else {
+                        state.selectedTokens = newSelection;
+                    }
+                    
+                    selectionBox.style.display = 'none';
+                    renderImage(); 
+                }
+                return;
+            }
+
+            // 2. Finalize Token Drag (PERBAIKAN DISINI)
+            if (state.draggingTokenId) {
+                // CEK: APAKAH BENAR-BENAR GERAK?
+                if (!state.tokenHasMoved) {
+                    // Kalau GAK gerak, berarti ini KLIK BIASA.
+                    // Bersihkan state, tapi JANGAN render ulang. 
+                    // Biarkan event 'click' berjalan biar Popup muncul.
+                    state.draggingTokenId = null;
+                    state.draggingTokenEl = null;
+                    return; 
+                }
+
+                // Kalau GERAK, simpan posisi baru & render ulang
+                const layer = imageContainer.querySelector('.image-inner');
+                const rect = layer.getBoundingClientRect();
+                
+                let newX = ((e.clientX - rect.left) / rect.width) * 100;
+                let newY = ((e.clientY - rect.top) / rect.height) * 100;
+                newX = Math.max(0, Math.min(100, newX));
+                newY = Math.max(0, Math.min(100, newY));
+
+                const mainToken = findTokenById(state.currentImage, state.draggingTokenId);
+                if (mainToken) {
+                    const deltaX = newX - mainToken.x;
+                    const deltaY = newY - mainToken.y;
+
+                    state.selectedTokens.forEach(id => {
+                        const t = findTokenById(state.currentImage, id);
+                        if (t) {
+                            t.x += deltaX;
+                            t.y += deltaY;
+                            t.x = Math.max(0, Math.min(100, t.x));
+                            t.y = Math.max(0, Math.min(100, t.y));
+                        }
+                    });
+                    
+                    if(!state.selectedTokens.includes(state.draggingTokenId)) {
+                        mainToken.x = newX;
+                        mainToken.y = newY;
+                    }
+                }
+                
+                if(state.draggingTokenEl) state.draggingTokenEl.classList.remove('dragging');
+                state.draggingTokenId = null;
+                state.draggingTokenEl = null;
+                
+                renderImage(); 
+                return;
+            }
+
+            // 3. Finalize Pan
+            if (state.isDragging) {
+                setTimeout(() => { state.isDragging = false; }, 50);
+                const wrapper = imageContainer.querySelector('.image-wrapper');
+                if (wrapper) wrapper.classList.remove('dragging');
+            }
+        }
+
+        function setInteractionMode(mode) {
+            state.interactionMode = mode;
+            if (mode === 'pan') {
+                panModeBtn.classList.add('active');
+                pinModeBtn.classList.remove('active');
+            } else {
+                pinModeBtn.classList.add('active');
+                panModeBtn.classList.remove('active');
+            }
+            updateUI();
+        }
+
+        function saveToFile() {
+            try {
+                const stateData = {
+                    navigationStack: state.navigationStack,
+                    mode: state.mode,
+                    zoom: state.zoom,
+                    gridSize: state.gridSize,
+                    showGrid: state.showGrid,
+                    savedPlayers: state.savedPlayers,
+                    timestamp: new Date().toISOString()
+                };
+                const dataStr = JSON.stringify(stateData, null, 2);
+                const blob = new Blob([dataStr], { type: 'application/json' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `dakons-backup-${Date.now()}.json`;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+                alert('✅ Project saved!');
+            } catch (e) {
+                alert('❌ Error while saving');
+            }
+        }
+
+        function loadFromFile() {
+            const input = document.createElement('input');
+            input.type = 'file';
+            input.accept = 'application/json';
+            input.onchange = (e) => {
+                const file = e.target.files[0];
+                if (file) {
+                    const reader = new FileReader();
+                    reader.onload = (event) => {
+                        try {
+                            const stateData = JSON.parse(event.target.result);
+                            
+                            // 1. Load Data Grid
+                            state.showGrid = stateData.showGrid || false;
+                            state.gridSize = stateData.gridSize || 35; // Default 35
+                            
+                            // [FIX PENTING] Update CSS Variable biar Token langsung menyesuaikan Grid!
+                            document.documentElement.style.setProperty('--grid-size', state.gridSize + 'px');
+
+                            // 2. Convert Data Token Lama ke Baru
+                            state.navigationStack = (stateData.navigationStack || []).map(convertToImageNode);
+                            state.currentImage = state.navigationStack.length > 0 ? state.navigationStack[state.navigationStack.length - 1] : null;
+                            
+                            // 3. Restore State Lainnya
+                            state.mode = 'add-pin';
+                            state.selectedPinId = null;
+                            state.zoom = stateData.zoom || 1;
+                            state.panX = 0;
+                            state.panY = 0;
+                            state.activeTool = 'link';
+                            state.savedPlayers = stateData.savedPlayers || [];
+                            
+                            // 4. Update UI Controls
+                            gridToggle.checked = state.showGrid;
+                            gridSizeInput.value = state.gridSize;
+
+                            if (state.currentImage) {
+                                renderImage();
+                                setTimeout(() => {
+                                    setInteractionMode('pin'); 
+                                }, 100);
+                                alert('✅ Project loaded!');
+                            } else {
+                                alert('❌ No valid data found');
+                            }
+                        } catch (err) {
+                            console.error(err);
+                            alert('❌ Error loading file');
+                        }
+                    };
+                    reader.readAsText(file);
+                }
+            };
+            input.click();
+        }
+
+        function toggleAltImage() {
+            state.showingAltImage = !state.showingAltImage;
+            renderImage();
+        }
+
+        function openPinNameModal() {
+            pinNameInput.value = '';
+            pinNameModal.classList.add('active');
+            pinNameInput.focus();
+            
+            if(state.pendingType === 'token') {
+                sizeInputContainer.style.display = 'block';
+                pinSizeInput.value = 35;
+            } else {
+                sizeInputContainer.style.display = 'none';
+            }
+        }
+
+        function closePinNameModal() {
+            pinNameModal.classList.remove('active');
+            if (state.pendingPinId) {
+                if (state.pendingType === 'pin') {
+                    const idx = state.currentImage.pins.findIndex(p => p.id === state.pendingPinId);
+                    if (idx !== -1 && !state.currentImage.pins[idx].name) state.currentImage.pins.splice(idx, 1);
+                } else if (state.pendingType === 'token') {
+                    const idx = state.currentImage.tokens.findIndex(t => t.id === state.pendingPinId);
+                    if (idx !== -1 && !state.currentImage.tokens[idx].name) state.currentImage.tokens.splice(idx, 1);
+                }
+                state.pendingPinId = null;
+                state.pendingType = null;
+            }
+            renderImage();
+        }
+
+        function savePinName() {
+            if (state.pendingPinId && state.pendingType) {
+                const name = pinNameInput.value.trim() || 'Unnamed';
+                if (state.pendingType === 'pin') {
+                    const pin = findPinById(state.currentImage, state.pendingPinId);
+                    if (pin) pin.name = name;
+                } else {
+                    const token = findTokenById(state.currentImage, state.pendingPinId);
+                    if (token) {
+                        token.name = name;
+                        const newSize = parseInt(pinSizeInput.value);
+                        if (newSize && newSize > 0) token.size = newSize;
+                    }
+                }
+                state.pendingPinId = null;
+                state.pendingType = null;
+            }
+            pinNameModal.classList.remove('active');
+            renderImage();
+        }
+
+        function editItemName(id, type) {
+            state.pendingPinId = parseFloat(id);
+            state.pendingType = type;
+            let name = '';
+            if (type === 'pin') {
+                const pin = findPinById(state.currentImage, state.pendingPinId);
+                if (pin) name = pin.name;
+                document.getElementById('modalTitle').textContent = 'Pin Name';
+                sizeInputContainer.style.display = 'none';
+            } else {
+                const token = findTokenById(state.currentImage, state.pendingPinId);
+                if (token) {
+                    name = token.name;
+                    sizeInputContainer.style.display = 'block';
+                    pinSizeInput.value = token.size || 50;
+                }
+                document.getElementById('modalTitle').textContent = 'Character Name & Size';
+            }
+            pinNameInput.value = name || '';
+            pinNameModal.classList.add('active');
+            pinNameInput.focus();
+        }
+
+        function openDeleteModal(id, type) {
+            state.itemToDelete = { id: parseFloat(id), type };
+            deleteConfirmModal.classList.add('active');
+        }
+
+        function closeDeleteModal() {
+            deleteConfirmModal.classList.remove('active');
+            state.itemToDelete = null;
+        }
+
+        function confirmDeletePin() {
+            if (state.itemToDelete) {
+                const { id, type } = state.itemToDelete;
+
+                // --- LOGIC BARU: HAPUS MASSAL ---
+                if (type === 'batch') {
+                    // Filter token: Ambil token yang ID-nya TIDAK ada di daftar selectedTokens
+                    state.currentImage.tokens = state.currentImage.tokens.filter(t => !state.selectedTokens.includes(t.id));
+                    state.selectedTokens = []; // Reset seleksi setelah dihapus
+                } 
+                // --------------------------------
+                else if (type === 'pin') {
+                    const idx = state.currentImage.pins.findIndex(p => p.id === id);
+                    if (idx !== -1) state.currentImage.pins.splice(idx, 1);
+                } else {
+                    const idx = state.currentImage.tokens.findIndex(t => t.id === id);
+                    if (idx !== -1) state.currentImage.tokens.splice(idx, 1);
+                }
+                renderImage();
+            }
+            closeDeleteModal();
+        }
+
+        function resetApp() {
+            if (confirm('Are you sure you want to reset the app?')) location.reload();
+        }
+
+        function convertToImageNode(obj) {
+            const node = new ImageNode(obj.src, obj.parentPinId);
+            node.id = obj.id;
+            node.altSrc = obj.altSrc || null;
+
+            if (obj.viewState){
+                node.viewState = obj.viewState
+            }
+
+            node.pins = obj.pins.map(pin => ({
+                id: pin.id,
+                x: pin.x,
+                y: pin.y,
+                name: pin.name || '',
+                linkedImage: pin.linkedImage ? convertToImageNode(pin.linkedImage) : null
+            }));
+
+            if (obj.tokens) {
+                node.tokens = obj.tokens.map(t => {
+                    // LOGIKA KONVERSI LEGACY:
+                    // Jika data lama punya 'scale', pakai itu.
+                    // Jika tidak, kita hitung dari 'size' (pixel).
+                    // Asumsi: Di sistem lama, 35px adalah ukuran standar 1 kotak (Medium).
+                    // Jadi: 35px -> Scale 1. 70px -> Scale 2.
+                    
+                    let finalScale = 1;
+                    if (t.scale) {
+                        finalScale = t.scale;
+                    } else if (t.size) {
+                        finalScale = t.size / 35; 
+                    }
+                    
+                    return {
+                        id: t.id,
+                        x: t.x,
+                        y: t.y,
+                        type: t.type,
+                        name: t.name || '',
+                        cls: t.cls || null,
+                        scale: finalScale,
+                        stats: t.stats || {}
+                    };
+                });
+            }
+
+            return node;
+        }
+
+        function openPlayerModal() {
+            state.editingTokenId = null; // Pastikan bukan mode edit
+            resetPlayerModalState(); // Reset tombol & form
+            
+            renderSavedPlayers();
+            document.getElementById('playerSavedList').style.display = 'grid'; // Munculin list
+            document.getElementById('addPlayerForm').style.display = 'none'; // Sembunyiin form
+            playerSelectModal.classList.add('active');
+        }
+
+        function closePlayerModal() {
+            playerSelectModal.classList.remove('active');
+        }
+
+        function toggleAddPlayerForm() {
+            addPlayerForm.style.display = addPlayerForm.style.display === 'none' ? 'block' : 'none';
+        }
+
+        function saveNewPlayer() {
+            // 1. Ambil Basic Info
+            const name = document.getElementById('newPlayerName').value.trim();
+            const cls = document.getElementById('newPlayerClass').value;
+            const lvl = document.getElementById('newPlayerLvl').value || 1;
+            const size = document.getElementById('newPlayerSize').value;
+            
+            // 2. Ambil Combat Stats
+            const ac = document.getElementById('newPlayerAC').value;
+            const hp = document.getElementById('newPlayerHP').value;
+            const speed = document.getElementById('newPlayerSpd').value;
+            const init = document.getElementById('newPlayerInit').value;
+
+            // 3. Ambil Ability Scores
+            const stats = {
+                str: document.getElementById('statStr').value,
+                dex: document.getElementById('statDex').value,
+                con: document.getElementById('statCon').value,
+                int: document.getElementById('statInt').value,
+                wis: document.getElementById('statWis').value,
+                cha: document.getElementById('statCha').value
+            };
+
+            if (!name) { alert("Nama karakter wajib diisi!"); return; }
+
+            // 4. Simpan ke Object Player Lengkap
+            const playerData = {
+                id: Date.now(),
+                name, cls, lvl, size, ac, hp, speed, init,
+                stats: stats // Masukkan object stats
+            };
+
+            state.savedPlayers.push(playerData);
+            
+            // Reset Form (Simpel aja reset nama, sisanya biarin biar gampang kalau mau input lagi)
+            document.getElementById('newPlayerName').value = '';
+            
+            toggleAddPlayerForm();
+            renderSavedPlayers();
+        }
+
+        function deleteSavedPlayer(id, e) {
+            e.stopPropagation(); // Biar gak kepilih card-nya
+            state.savedPlayers = state.savedPlayers.filter(p => p.id !== id);
+            renderSavedPlayers();
+        }
+
+        function renderSavedPlayers() {
+            playerSavedList.innerHTML = '';
+            if (state.savedPlayers.length === 0) {
+                playerSavedList.innerHTML = '<div style="grid-column: 1/-1; text-align:center; color:#888; font-size:12px;">No saved characters yet.</div>';
+                return;
+            }
+
+            state.savedPlayers.forEach(p => {
+                const iconContent = getIconHTML('player', p.cls);
+                // Tampilkan Lvl, AC, HP
+                const subtitle = `Lvl ${p.lvl || 1} • AC ${p.ac || 10} • HP ${p.hp || 10}`;
+
+                const card = document.createElement('div');
+                card.className = 'player-card';
+                card.innerHTML = `
+                    <div class="delete-player-btn" onclick="deleteSavedPlayer(${p.id}, event)">✕</div>
+                    <div class="player-card-icon">${iconContent}</div>
+                    <div class="player-card-name">${p.name}</div>
+                    <div class="player-card-stats">${subtitle}</div>
+                `;
+                card.onclick = () => spawnPlayerToMap(p);
+                playerSavedList.appendChild(card);
+            });
+        }
+
+        // 3. UPDATE FUNGSI SPAWN PLAYER (PENTING! Konversi Size ke Scale)
+        function spawnPlayerToMap(playerData) {
+            const scale = getMonsterScale(playerData.size || 'Medium');
+
+            // [FIX UTAMA DISINI] 🛠️
+            // Pastikan HP dan AC tidak kosong/undefined. Kalau kosong kasih default.
+            const safeHP = playerData.hp && playerData.hp !== "" ? playerData.hp : 10;
+            const safeAC = playerData.ac && playerData.ac !== "" ? playerData.ac : 10;
+            const safeInit = playerData.init && playerData.init !== "" ? playerData.init : 0;
+
+            const tokenStats = {
+                ...playerData.stats, 
+                hp: safeHP,
+                ac: safeAC,
+                speed: playerData.speed || 30,
+                init: safeInit,
+                lvl: playerData.lvl || 1
+            };
+
+            state.currentImage.addToken(
+                pendingPlayerPos.x, 
+                pendingPlayerPos.y, 
+                'player', 
+                playerData.name, 
+                playerData.cls, 
+                scale,
+                tokenStats 
+            );
+            
+            renderImage();
+            closePlayerModal();
+            
+            // Auto refresh battle tracker
+            if (battleTracker.style.display !== 'none') {
+                refreshBattleList();
+            }
+        }
+
+        function toggleSection(id) {
+            const el = document.getElementById(id);
+            const arrow = document.getElementById(id + 'Arrow');
+            if (el) {
+                el.classList.toggle('collapsed');
+                if (arrow) {
+                    arrow.textContent = el.classList.contains('collapsed') ? '▶' : '▼';
+                }
+            }
+        }
+
+        function openEditTokenMode(tokenId) {
+            // 1. Cari Tokennya
+            const t = findTokenById(state.currentImage, parseFloat(tokenId));
+            if (!t) return;
+
+            state.editingTokenId = t.id; // Tandai kita lagi mode edit
+
+            // 2. Siapkan Data (Handle data baru 'stats' & data lama)
+            const s = t.stats || {}; // Ambil stats kalau ada
+            
+            // 3. Isi Form dengan Data Token
+            document.getElementById('newPlayerName').value = t.name;
+            document.getElementById('newPlayerClass').value = t.cls || 'fighter';
+            document.getElementById('newPlayerLvl').value = s.lvl || 1;
+            
+            // Konversi Scale balik ke Size string (Agak manual dikit gapapa ya)
+            let sizeStr = 'Medium';
+            if(t.scale === 0.8) sizeStr = 'Small';
+            if(t.scale === 2) sizeStr = 'Large';
+            if(t.scale === 3) sizeStr = 'Huge';
+            document.getElementById('newPlayerSize').value = sizeStr;
+
+            // Combat Stats
+            document.getElementById('newPlayerAC').value = s.ac || t.ac || 10;
+            document.getElementById('newPlayerHP').value = s.hp || t.hp || 10;
+            document.getElementById('newPlayerSpd').value = s.speed || 30;
+            document.getElementById('newPlayerInit').value = s.init || 0;
+
+            // Attributes
+            document.getElementById('statStr').value = s.str || 10;
+            document.getElementById('statDex').value = s.dex || 10;
+            document.getElementById('statCon').value = s.con || 10;
+            document.getElementById('statInt').value = s.int || 10;
+            document.getElementById('statWis').value = s.wis || 10;
+            document.getElementById('statCha').value = s.cha || 10;
+
+            // 4. Ubah Tampilan Modal
+            // Sembunyikan list roster, munculkan form
+            document.getElementById('playerSavedList').style.display = 'none';
+            document.getElementById('addPlayerForm').style.display = 'block';
+            
+            // Ganti teks tombol biar jelas
+            const btn = document.querySelector('#addPlayerForm button');
+            btn.textContent = "Update Token Stats";
+            btn.onclick = savePlayerFormHandler; // Ganti handler ke fungsi pintar
+
+            // Buka Modal
+            playerSelectModal.classList.add('active');
+        }
+
+        function savePlayerFormHandler() {
+            // Kalau state.editingTokenId ada isinya, berarti lagi EDIT TOKEN
+            if (state.editingTokenId) {
+                updateTokenData();
+            } else {
+                // Kalau null, berarti lagi SAVE NEW PLAYER (panggil fungsi lamamu)
+                saveNewPlayer();
+            }
+        }
+
+        function updateTokenData() {
+            const t = findTokenById(state.currentImage, state.editingTokenId);
+            if (!t) return;
+
+            // 1. Ambil Data dari Form (Sama kayak saveNewPlayer)
+            const name = document.getElementById('newPlayerName').value;
+            const cls = document.getElementById('newPlayerClass').value;
+            const size = document.getElementById('newPlayerSize').value;
+            
+            // Update Basic Info
+            t.name = name;
+            t.cls = cls;
+            t.scale = getMonsterScale(size); // Update ukuran di map langsung!
+            t.size = (t.scale * 35); // Update legacy size properti jaga-jaga
+
+            // 2. Update Stats Object
+            t.stats = {
+                lvl: document.getElementById('newPlayerLvl').value,
+                ac: document.getElementById('newPlayerAC').value,
+                hp: document.getElementById('newPlayerHP').value,
+                speed: document.getElementById('newPlayerSpd').value,
+                init: document.getElementById('newPlayerInit').value,
+                str: document.getElementById('statStr').value,
+                dex: document.getElementById('statDex').value,
+                con: document.getElementById('statCon').value,
+                int: document.getElementById('statInt').value,
+                wis: document.getElementById('statWis').value,
+                cha: document.getElementById('statCha').value
+            };
+
+            // 3. Bersih-bersih
+            state.editingTokenId = null;
+            renderImage(); // Refresh map biar ukuran/nama berubah
+            closePlayerModal();
+            
+            // Kembalikan tombol Save ke mode normal (Add New)
+            resetPlayerModalState(); 
+        }
+
+        // Helper buat reset modal pas ditutup
+        function resetPlayerModalState() {
+            const btn = document.querySelector('#addPlayerForm button');
+            btn.textContent = "Save to Roster";
+            btn.onclick = saveNewPlayer; // Balikin onclick ke fungsi asli
+            document.getElementById('newPlayerName').value = ''; // Reset form
+            // ... (Reset input lain kalau mau rajin) ...
+        }
+
+        // --- LOGIC POPUP BUBBLE & SMART POSITION ---
+        
+        function updatePopupPosition() {
+            // 1. Cek validitas
+            if (!state.activePopupTokenId) return;
+            const tEl = document.querySelector(`.token[data-token-id="${state.activePopupTokenId}"]`);
+            if (!tEl) { closeCharacterPopup(); return; }
+            
+            const popup = document.getElementById('characterPopup');
+            if (!popup) return;
+
+            const rect = tEl.getBoundingClientRect();
+            const popupWidth = popup.offsetWidth;
+            const popupHeight = popup.offsetHeight;
+
+            // 2. Hitung Posisi Vertikal (Default: Di ATAS Token)
+            let top = rect.top - popupHeight - 15; 
+            
+            // Logic Flip Vertikal (Mentok Atas -> Pindah Bawah)
+            if (top < 80) { // 80px buffer buat header
+                top = rect.bottom + 15;
+                popup.classList.add('flipped');
+            } else {
+                popup.classList.remove('flipped');
+            }
+
+            // 3. Hitung Posisi Horizontal (Default: Tengah Token)
+            let left = rect.left + (rect.width / 2) - (popupWidth / 2);
+
+            // Logic Mentok Kanan/Kiri (Clamping)
+            const margin = 10;
+            // Gak boleh kurang dari margin kiri
+            if (left < margin) left = margin; 
+            // Gak boleh lebih dari lebar layar - margin kanan
+            if (left + popupWidth > window.innerWidth - margin) {
+                left = window.innerWidth - popupWidth - margin;
+            }
+
+            // 4. TERAPKAN POSISI KOTAK
+            popup.style.top = `${top}px`;
+            popup.style.left = `${left}px`;
+
+            // 5. LOGIC PANAH PINTAR (Horizontal Adjustment)
+            // Dimana titik tengah token secara absolut?
+            const tokenCenterAbs = rect.left + (rect.width / 2);
+            
+            // Dimana titik itu kalau dilihat relatif dari kotak popup?
+            let arrowRelX = tokenCenterAbs - left;
+
+            // Batasi panah biar gak keluar dari sudut kotak (Border Radius protection)
+            // Misal border radius 12px, kita kasih buffer 20px biar aman
+            arrowRelX = Math.max(20, Math.min(popupWidth - 20, arrowRelX));
+
+            // Kirim koordinat ke CSS Variable
+            popup.style.setProperty('--arrow-left', `${arrowRelX}px`);
+        }
+
+        function showCharacterPopup(tokenId) {
+
+            // 1. Validasi Token
+            const t = findTokenById(state.currentImage, tokenId);
+            if (!t) return;
+            
+            // [UPDATE] Kalau tipe musuh, JANGAN buka popup!
+            if (t.type === 'enemy') {
+                closeCharacterPopup(); // Tutup kalau ada popup lain kebuka
+                return;
+            }
+            
+            // 2. Set State Aktif (Penting buat Smart Positioning)
+            state.activePopupTokenId = tokenId;
+            
+            // 3. Siapkan Data
+            const s = t.stats || {};
+            const icon = getIconHTML(t.type, t.cls);
+            
+            // 4. Generate HTML (Lengkap dengan HP Bar Visual)
+            const popupHtml = `
+                <div class="char-header">
+                    <div class="char-icon-frame">${icon}</div>
+                    <div class="char-info">
+                        <h3>${t.name}</h3>
+                        <span>${t.cls || t.type} • Lvl ${s.lvl || 1}</span>
+                    </div>
+                    <div style="margin-left:auto; cursor:pointer; color:#666;" onclick="closeCharacterPopup()">✕</div>
+                </div>
+
+                <div class="char-vitals">
+                    <div class="vital-box"><span class="vital-label">AC</span><span class="vital-val ac">${s.ac || 10}</span></div>
+                    
+                    <div class="vital-box" style="min-width: 60px;">
+                        <span class="vital-label">HP</span>
+                        <span class="vital-val hp">${s.hp || 10}</span>
+                        <div class="vital-hp-bar">
+                            <div class="vital-hp-fill" style="width: 100%;"></div>
+                        </div>
+                    </div>
+
+                    <div class="vital-box"><span class="vital-label">SPD</span><span class="vital-val">${s.speed || 30}</span></div>
+                    <div class="vital-box"><span class="vital-label">INIT</span><span class="vital-val">${formatMod(parseInt(s.init || 0))}</span></div>
+                </div>
+
+                <div class="char-stats">
+                    ${['str', 'dex', 'con', 'int', 'wis', 'cha'].map(stat => {
+                        const score = s[stat] || 10;
+                        const mod = getAbilityMod(score);
+                        return `
+                        <div class="ability-box">
+                            <span class="abil-name">${stat.toUpperCase()}</span>
+                            <span class="abil-mod">${formatMod(mod)}</span>
+                            <span class="abil-score">${score}</span>
+                        </div>`;
+                    }).join('')}
+                </div>
+
+                <div class="char-actions">
+                    <button class="mini-btn" onclick="openEditTokenMode('${t.id}')">✏️ Edit</button>
+                    <button class="mini-btn" onclick="openDeleteModal('${t.id}', 'token')">🗑️ Delete</button>
+                </div>
+            `;
+
+            // 5. Render ke DOM
+            const popup = document.getElementById('characterPopup');
+            popup.innerHTML = popupHtml;
+            popup.classList.add('active');
+
+            // 6. Update Posisi (Panggil fungsi Smart Positioning segera)
+            updatePopupPosition();
+        }
+
+        function closeCharacterPopup() {
+            state.activePopupTokenId = null; 
+            const popup = document.getElementById('characterPopup');
+            if(popup) popup.classList.remove('active');
+        }
+
+        const battleModal = document.getElementById('battleModal');
+        const battleList = document.getElementById('battleList');
+        const battleBtn = document.getElementById('battleBtn');
+        const battleTracker = document.getElementById('battleTracker');
+
+        function openBattleTracker() {
+            if (!state.currentImage) return;
+            
+            // 1. Pastikan display bukan none (hapus style inline peninggalan masa lalu)
+            battleTracker.style.display = ''; 
+            
+            // 2. [TRIK MAGIC] Paksa browser "baca ulang" (Reflow).
+            // Tanpa baris ini, browser kadang males animasiin dari display:none.
+            void battleTracker.offsetWidth; 
+            
+            // 3. Baru pasang class active buat memicu animasi CSS
+            battleTracker.classList.add('active');
+            
+            // Logic Refresh List
+            if (state.combatants.length === 0) {
+                refreshBattleList();
+            } else {
+                renderBattleListUI(); 
+            }
+        }
+
+        function closeBattleTracker() {
+            // Cabut class active -> Otomatis animasi menghilang jalan
+            battleTracker.classList.remove('active');
+        }
+
+        // --- BATTLE TRACKER: FLOATING & DRAGGABLE ---
+
+        function getInitMod(token) {
+            if (token.stats && token.stats.init) return parseInt(token.stats.init);
+            return 0;
+        }
+
+        function refreshBattleList() {
+            // Ambil semua token, simpan referensinya
+            state.combatants = [...state.currentImage.tokens];
+            // Render tanpa sorting dulu (default)
+            renderBattleListUI();
+        }
+    
+
+        // Dummy Functions (Nanti kita isi logicnya)
+        function rollAllInitiative() {
+            if (!state.currentImage || state.currentImage.tokens.length === 0) return;
+
+            let rolledCount = 0;
+
+            state.combatants.forEach(token => {
+                // SKIP PLAYER (Mereka input manual)
+                if (token.type === 'player') return;
+
+                // SKIP YANG SUDAH PUNYA NILAI (Biar monster lama gak ke-reset)
+                // Kita anggap sudah punya nilai kalau defined dan bukan '-'
+                if (token.initiativeTotal !== undefined && token.initiativeTotal !== '-') return;
+
+                // LOGIC ROLL: D20 + Init Stat
+                // [FIX] Pakai 'init' stat langsung sesuai request
+                const mod = parseInt(token.stats?.init || 0); 
+                const roll = Math.floor(Math.random() * 20) + 1;
+                
+                token.initiativeTotal = roll + mod;
+                rolledCount++;
+            });
+
+            // Kalau ada perubahan, sortir ulang
+            if (rolledCount > 0) {
+                sortCombatants();
+                renderBattleListUI();
+                // Opsional: Kasih notif kecil
+                // alert(`🎲 ${rolledCount} monster baru telah di-roll!`);
+            } else {
+                alert("Semua monster sudah punya initiative! Reset dulu kalau mau roll ulang.");
+            }
+        }
+
+        function updateInitiativeManual(id, value) {
+            const token = state.combatants.find(t => t.id === parseFloat(id));
+            if (token) {
+                // Simpan nilai mentah-mentah (User bilang "inputnya udah total")
+                token.initiativeTotal = parseInt(value) || 0;
+                
+                // Langsung urutkan ulang biar dinamis!
+                sortCombatants();
+                renderBattleListUI();
+            }
+        }
+
+        function sortCombatants() {
+            state.combatants.sort((a, b) => {
+                const valA = (a.initiativeTotal !== undefined && a.initiativeTotal !== '-') ? a.initiativeTotal : -999;
+                const valB = (b.initiativeTotal !== undefined && b.initiativeTotal !== '-') ? b.initiativeTotal : -999;
+                return valB - valA;
+            });
+        }
+
+        function nextTurn() {
+            if (state.combatants.length === 0) return;
+
+            // Pindah ke orang berikutnya
+            state.currentTurnIndex++;
+
+            // Kalau sudah lewat peserta terakhir, balik ke awal (Ronde Baru)
+            if (state.currentTurnIndex >= state.combatants.length) {
+                state.currentTurnIndex = 0;
+                // Bisa tambah logic "Round ++" disini kalau mau
+            }
+
+            renderBattleListUI();
+            
+            // Auto-Center Camera ke Token yang aktif (Opsional, biar DM gak pusing cari orangnya)
+            const activeToken = state.combatants[state.currentTurnIndex];
+            if (activeToken) {
+                focusOnToken(activeToken.id);
+            }
+        }
+
+
+        // 2. LOGIC DRAGGABLE (PENTING!)
+        // Panggil ini di init() atau setupEventListeners()
+        function makeDraggable(elmnt) {
+            let pos1 = 0, pos2 = 0, pos3 = 0, pos4 = 0;
+            const header = document.getElementById(elmnt.id + "Header");
+            
+            if (header) {
+                // Jika klik di header, mulai drag
+                header.onmousedown = dragMouseDown;
+            }
+
+            function dragMouseDown(e) {
+                e = e || window.event;
+                e.preventDefault();
+                // Ambil posisi mouse awal
+                pos3 = e.clientX;
+                pos4 = e.clientY;
+                
+                // Stop event biar map di bawahnya gak ikut ke-drag!
+                e.stopPropagation(); 
+                
+                document.onmouseup = closeDragElement;
+                document.onmousemove = elementDrag;
+            }
+
+            function elementDrag(e) {
+                e = e || window.event;
+                e.preventDefault();
+                // Hitung pergeseran
+                pos1 = pos3 - e.clientX;
+                pos2 = pos4 - e.clientY;
+                pos3 = e.clientX;
+                pos4 = e.clientY;
+                
+                // Set posisi baru
+                elmnt.style.top = (elmnt.offsetTop - pos2) + "px";
+                elmnt.style.left = (elmnt.offsetLeft - pos1) + "px";
+            }
+
+            function closeDragElement() {
+                // Stop moving when mouse button is released:
+                document.onmouseup = null;
+                document.onmousemove = null;
+            }
+        }
+
+        function renderBattleListUI() {
+            if (state.combatants.length === 0) {
+                battleList.innerHTML = '<div style="padding:10px; color:#666; text-align:center;">Map sepi...</div>';
+                return;
+            }
+
+            battleList.innerHTML = state.combatants.map((t, index) => {
+                const icon = getIconHTML(t.type, t.cls);
+                const isActive = (index === state.currentTurnIndex) ? 'active-turn' : '';
+                const activeStyle = isActive ? 'border-left: 4px solid #2ecc71; background: rgba(46, 204, 113, 0.2);' : '';
+                
+                // Setup MaxHP buat display (contoh: 15 / 20)
+                const currentHP = t.stats?.hp || 0;
+                // Kalau maxHp belum ada, anggap HP sekarang adalah max (sementara)
+                const maxHP = t.stats?.maxHp !== undefined ? t.stats.maxHp : currentHP;
+
+                // --- LOGIC INPUT INITIATIVE ---
+                let initDisplay = '';
+                if (t.type === 'player') {
+                    const val = (t.initiativeTotal !== undefined && t.initiativeTotal !== '-') ? t.initiativeTotal : '';
+                    initDisplay = `<input type="number" class="init-input" value="${val}" placeholder="0" 
+                                    onchange="updateInitiativeManual('${t.id}', this.value)" 
+                                    onclick="event.stopPropagation()">`; 
+                } else {
+                    const val = (t.initiativeTotal !== undefined) ? t.initiativeTotal : '-';
+                    const color = val === '-' ? '#f1c40f' : '#fff';
+                    initDisplay = `<span style="color:${color}; font-size:16px;">${val}</span>`;
+                }
+
+                return `
+                <div class="battle-item" style="${activeStyle}">
+                    <div class="battle-item-icon">${icon}</div>
+                    
+                    <div style="flex:1;">
+                        <div class="battle-item-name">${t.name}</div>
+                        <div style="font-size:11px; color:#aaa; display:flex; align-items:center;">
+                            <span style="color:${currentHP < maxHP / 2 ? '#e74c3c' : '#2ecc71'}">
+                                HP: ${currentHP} / ${maxHP}
+                            </span>
+                            
+                            <div class="hp-controls">
+                                <button class="btn-mini-hp btn-heal" onclick="promptHP('${t.id}', 'heal')" title="Heal">+</button>
+                                <button class="btn-mini-hp btn-dmg" onclick="promptHP('${t.id}', 'dmg')" title="Damage">−</button>
+                            </div>
+                            
+                            <span style="margin-left:8px; border-left:1px solid #444; padding-left:8px;">
+                                AC: ${t.stats?.ac || '?'}
+                            </span>
+                        </div>
+                    </div>
+
+                    <div style="font-weight:bold; min-width:50px; text-align:right;">
+                        ${initDisplay}
+                    </div>
+                </div>
+                `;
+            }).join('');
+        }
+
+        function focusOnToken(tokenId) {
+            const t = findTokenById(state.currentImage, tokenId);
+            if (!t) return;
+
+            // Hitung panX/panY biar token ada di tengah layar
+            // Rumus simpel: Geser canvas supaya titik token ketemu titik tengah layar
+            // Ini agak tricky karena logic Pan/Zoom kamu manual, jadi kita skip dulu kalau pusing.
+            // Tapi idenya: highlight tokennya di map.
+            
+            // Hapus highlight lama
+            document.querySelectorAll('.token').forEach(el => el.style.boxShadow = '');
+            
+            // Tambah highlight baru (Glow Hijau)
+            const el = document.querySelector(`.token[data-token-id="${tokenId}"]`);
+            if (el) {
+                el.style.boxShadow = '0 0 20px #2ecc71, 0 0 40px #2ecc71';
+                setTimeout(() => el.style.boxShadow = '', 2000); // Ilang setelah 2 detik
+            }
+        }
+
+        // --- LOGIC HEAL & DAMAGE ---
+
+        function adjustTokenHP(id, amount) {
+            const token = findTokenById(state.currentImage, parseFloat(id));
+            if (!token || !token.stats) return;
+
+            // 1. Inisialisasi Max HP kalau belum ada
+            // (Asumsi saat pertama kali spawn, HP stat adalah Max HP)
+            if (token.stats.maxHp === undefined) {
+                token.stats.maxHp = parseInt(token.stats.hp) || 10;
+            }
+
+            // 2. Hitung HP Baru
+            let current = parseInt(token.stats.hp) || 0;
+            const max = token.stats.maxHp;
+
+            let newHp = current + amount;
+
+            // Logic Cap: Gak boleh < 0, Gak boleh > Max HP
+            if (newHp < 0) newHp = 0;
+            if (newHp > max) newHp = max;
+
+            // 3. Simpan
+            token.stats.hp = newHp;
+
+            // 4. Update Visual (List & Map)
+            renderBattleListUI(); // Update angka di jendela battle
+            updateMapTokenHP(token); // Update bar hijau di map
+        }
+
+        function promptHP(id, type) {
+            // Stop event biar gak nge-drag jendela battle
+            event.stopPropagation();
+            
+            const action = type === 'heal' ? 'Heal' : 'Damage';
+            const input = prompt(`Enter ${action} amount:`);
+            
+            if (input !== null && input !== "") {
+                let val = parseInt(input);
+                if (isNaN(val)) return;
+
+                // Kalau damage, bikin negatif
+                if (type === 'dmg') val = -val;
+                
+                adjustTokenHP(id, val);
+            }
+        }
+
+        // Helper: Update Bar Hijau di Map tanpa render ulang seluruh gambar
+        function updateMapTokenHP(token) {
+            const tokenEl = document.querySelector(`.token[data-token-id="${token.id}"]`);
+            if (!tokenEl) return;
+
+            // Cari elemen fill bar-nya
+            const barFill = tokenEl.querySelector('.token-hp-fill');
+            if (barFill) {
+                const max = token.stats.maxHp || token.stats.hp || 1; // Fallback aman
+                const current = token.stats.hp;
+                
+                // Hitung persentase
+                const pct = Math.max(0, Math.min(100, (current / max) * 100));
+                
+                // Ubah lebar & warna (Hijau -> Kuning -> Merah)
+                barFill.style.width = `${pct}%`;
+                
+                if (pct > 50) barFill.style.background = 'linear-gradient(to right, #2ecc71, #27ae60)';
+                else if (pct > 20) barFill.style.background = 'linear-gradient(to right, #f1c40f, #f39c12)';
+                else barFill.style.background = 'linear-gradient(to right, #e74c3c, #c0392b)';
+            }
+        }
+
+        init();
+    </script>
+</body>
+</html>

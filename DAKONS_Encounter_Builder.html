@@ -1,0 +1,1023 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dakons Encounter Builder</title>
+    <style>
+        :root {
+            --color-background: #1a1a1a;
+            --color-surface: #2d2d2d;
+            --color-text: #e8e8e8;
+            --color-text-secondary: #a0a0a0;
+            --color-primary: #8b4513;
+            --color-primary-hover: #a0522d;
+            --color-border: rgba(139, 69, 19, 0.4);
+            --color-secondary: rgba(139, 69, 19, 0.2);
+            --color-secondary-hover: rgba(139, 69, 19, 0.3);
+            --radius-base: 8px;
+            --space-8: 8px;
+            --space-12: 12px;
+            --space-16: 16px;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: 'Modesto Condensed', 'Cinzel', Georgia, serif;
+            background: var(--color-background);
+            color: var(--color-text);
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        /* --- LAYOUT UTAMA --- */
+        .container { 
+            display: flex; 
+            flex-direction: column; /* INI KUNCINYA: Numpuk ke bawah */
+            height: 100%; 
+            padding: var(--space-16);
+            overflow: hidden;
+        }
+
+        h1 {
+            color: var(--color-primary);
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            font-size: 24px;
+            margin-bottom: var(--space-12);
+            flex-shrink: 0; /* Biar judul gak kegencet */
+        }
+
+        /* --- TABS --- */
+        .tab-container {
+            display: flex; gap: 8px; 
+            margin-bottom: 16px; 
+            border-bottom: 2px solid var(--color-border);
+            flex-shrink: 0;
+        }
+
+        .tab-btn {
+            padding: 10px 20px;
+            background: transparent;
+            border: none;
+            border-bottom: 3px solid transparent;
+            color: var(--color-text-secondary);
+            cursor: pointer; font-weight: bold; font-size: 14px;
+        }
+
+        .tab-btn:hover { color: var(--color-primary); }
+        .tab-btn.active {
+            color: var(--color-primary);
+            border-bottom-color: var(--color-primary);
+        }
+
+        /* --- CONTENT AREA --- */
+        .tab-content {
+            flex: 1; /* Ambil sisa tinggi layar */
+            overflow: hidden; /* Biar scroll ditangani child */
+            display: none; /* Default hidden, diatur JS */
+        }
+        
+        /* Fix Layout 2 Kolom */
+        .layout {
+            display: flex;
+            gap: 16px;
+            height: 100%; /* Menuhin tab-content */
+            overflow: hidden;
+        }
+
+        .panel {
+            background: var(--color-surface);
+            border: 1px solid var(--color-border);
+            border-radius: 4px;
+            padding: 16px;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .left-panel {
+            flex: 2; 
+            overflow-y: hidden;
+        }
+
+        .right-panel {
+            flex: 1;
+        }
+
+        /* --- KOMPONEN LAIN --- */
+        .filters {
+            display: flex; flex-direction: column; gap: var(--space-12); margin-bottom: var(--space-12);
+        }
+
+        input, select {
+            background: var(--color-surface); border: 1px solid var(--color-border);
+            color: var(--color-text); padding: var(--space-8);
+            border-radius: var(--radius-base); font-size: 14px;
+        }
+        input:focus, select:focus { outline: none; border-color: var(--color-primary); }
+
+        .monster-list {
+            flex: 1; overflow-y: auto; 
+            border: 1px solid var(--color-border);
+            border-radius: var(--radius-base); 
+            background: rgba(0,0,0,0.2);
+            margin-top: 10px;
+        }
+
+        .monster-row {
+            display: grid; grid-template-columns: 3fr 1fr 1fr 0.5fr 0.5fr; 
+            padding: var(--space-8) var(--space-12);
+            border-bottom: 1px solid var(--color-secondary);
+            align-items: center; font-size: 14px; transition: background 0.1s;
+        }
+        .monster-row:hover { background: var(--color-secondary); }
+
+        .clickable-name {
+            font-weight: bold; color: var(--color-primary);
+            cursor: pointer; text-decoration: underline; text-decoration-color: transparent;
+            transition: all 0.2s;
+        }
+        .clickable-name:hover { text-decoration-color: var(--color-primary); color: #fff; }
+
+        .btn {
+            background: var(--color-primary); color: #1a1a1a; border: none;
+            padding: 4px 12px; border-radius: 4px; cursor: pointer;
+            font-weight: bold; text-transform: uppercase; font-size: 12px;
+        }
+        .btn:hover { background: var(--color-primary-hover); }
+        .btn-secondary { background: var(--color-secondary); color: var(--color-text); border: 1px solid var(--color-border); }
+        .btn-secondary:hover { background: var(--color-secondary-hover); }
+
+        .encounter-list {
+            flex: 1; overflow-y: auto; margin-bottom: 10px;
+        }
+
+        .encounter-item {
+            display: flex; justify-content: space-between; align-items: center;
+            padding: var(--space-8); background: rgba(0,0,0,0.2);
+            border: 1px solid var(--color-border); border-radius: 4px; margin-bottom: 8px;
+        }
+        .encounter-info { flex: 1; display: flex; flex-direction: column; }
+        .encounter-meta { font-size: 11px; color: var(--color-text-secondary); }
+
+        .qty-controls {
+            display: flex; align-items: center; gap: 8px;
+            background: var(--color-background); padding: 2px 6px;
+            border-radius: 4px; border: 1px solid var(--color-border);
+        }
+        .qty-btn {
+            background: none; border: none; color: var(--color-primary);
+            font-weight: bold; cursor: pointer; width: 20px; height: 20px;
+            display: flex; align-items: center; justify-content: center;
+        }
+        .qty-btn:hover { background: var(--color-secondary); border-radius: 50%; }
+        .qty-val { font-weight: bold; min-width: 20px; text-align: center; }
+
+        .total-bar {
+            padding: 10px; background: rgba(0,0,0,0.3);
+            border-radius: 4px; text-align: right; font-weight: bold;
+            color: var(--color-primary);
+        }
+
+        /* --- STAT BLOCK (TAB 2) --- */
+        .stat-block-container {
+            flex: 1; overflow-y: auto;
+            display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            gap: 16px; padding-bottom: 20px; align-content: start;
+        }
+
+        .stat-card {
+            background: #fdf6e3;
+            color: #1a1a1a;
+            border: 1px solid #d4a574;
+            border-radius: 4px;
+            padding: 16px;
+            font-family: 'Georgia', serif;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+            border-top: 5px solid #8b0000;
+            
+            /* INI TAMBAHAN PENTING BIAR BISA SCROLL */
+            max-height: 500px;       /* Tinggi maksimal kartu */
+            overflow-y: auto;        /* Munculin scroll kalau kepanjangan */
+            scrollbar-width: thin;   /* Scrollbar tipis (Firefox) */
+            display: flex;           /* Flex biar rapi */
+            flex-direction: column;
+        }
+
+        .stat-card::-webkit-scrollbar { width: 6px; }
+        .stat-card::-webkit-scrollbar-thumb { background: #8b0000; border-radius: 3px; }
+        .stat-card::-webkit-scrollbar-track { background: #eee; }
+
+        .stat-block { width: 90%; max-width: 500px; max-height: 85vh; border: 2px solid #58180d; overflow-y: auto; }
+        
+        .stat-name { font-size: 20px; font-weight: bold; color: #8b0000; margin-bottom: 2px; }
+        .stat-meta, .meta { font-style: italic; font-size: 12px; margin-bottom: 8px; color: #333; }
+        .stat-divider, .red-line { height: 2px; background: #8b0000; margin: 8px 0; }
+        .stat-line, .property-line { margin-bottom: 4px; font-size: 13px; }
+        .stat-attr, .stat-grid { 
+            display: flex; justify-content: space-around; 
+            background: rgba(139, 0, 0, 0.1); padding: 8px 0;
+            margin: 8px 0; border-radius: 4px;
+        }
+        .stat-grid-2 {
+            display: grid;
+            grid-template-columns: 1fr 1fr; /* Dua kolom */
+            gap: 4px;
+            font-size: 14px;
+            margin-bottom: 8px;
+        }
+        .attr-box, .stat-box { text-align: center; display: flex; flex-direction: column; }
+        .attr-name { font-weight: bold; font-size: 10px; color: #8b0000; }
+        .attr-val, .stat-val { font-size: 14px; font-weight: bold; }
+        
+        .section-title { font-size: 16px; border-bottom: 1px solid #8b0000; color: #8b0000; margin: 12px 0 4px; font-variant: small-caps; }
+        .action-item { margin-bottom: 8px; font-size: 13px; }
+        .action-name { font-weight: bold; font-style: italic; }
+
+        /* --- MODAL --- */
+        .modal-overlay {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0, 0, 0, 0.7); z-index: 1000;
+            display: none; justify-content: center; align-items: center;
+            backdrop-filter: blur(4px);
+        }
+        .modal-overlay.active { display: flex; }
+        .close-modal-btn {
+            position: absolute; top: 10px; right: 10px;
+            background: #c0392b; color: white; border: none;
+            width: 30px; height: 30px; border-radius: 50%;
+            cursor: pointer; font-weight: bold;
+        }
+
+        /* --- WIDGETS --- */
+        .slider-container { position: relative; width: 100%; height: 30px; margin-top: 10px; }
+        .slider-track { position: absolute; top: 50%; transform: translateY(-50%); width: 100%; height: 4px; background: var(--color-border); border-radius: 2px; }
+        .range-input { position: absolute; top: 50%; transform: translateY(-50%); width: 100%; pointer-events: none; appearance: none; background: none; border: none; margin: 0; }
+        .range-input::-webkit-slider-thumb { appearance: none; pointer-events: auto; width: 16px; height: 16px; border-radius: 50%; background: var(--color-primary); border: 2px solid #fff; cursor: pointer; z-index: 2; }
+        
+        .type-container { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 8px; max-height: 80px; overflow-y: auto; }
+        .type-pill { font-size: 11px; padding: 2px 8px; border: 1px solid var(--color-border); border-radius: 12px; cursor: pointer; background: var(--color-surface); color: var(--color-text-secondary); transition: all 0.2s; user-select: none; }
+        .type-pill:hover { border-color: var(--color-primary); }
+        .type-pill.active { background: var(--color-primary); color: #1a1a1a; border-color: var(--color-primary); font-weight: bold; }
+
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: #1a1a1a; }
+        ::-webkit-scrollbar-thumb { background: var(--color-border); border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: var(--color-primary); }
+
+        @media (prefers-color-scheme: dark) { .stat-card, .stat-block { filter: brightness(0.9); } }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>⚔️ Encounter Builder</h1>
+        <div class="tab-container">
+            <button class="tab-btn active" onclick="switchTab('builder')">Builder</button>
+            <button class="tab-btn" onclick="switchTab('stats')">Active Stats</button>
+        </div>
+
+        <div id="tab-builder" class="tab-content">
+            <div class="layout">
+                <div class="panel left-panel">
+                    <div class="filters" style="display: flex; flex-direction: column; gap: 12px;">
+                        <div style="display: grid; grid-template-columns: 2fr 1fr; gap: 8px;">
+                            <input type="text" id="searchBar" placeholder="Search monster name...">
+                            <select id="sourceFilter"><option value="all">All Sources</option></select>
+                        </div>
+                        <div>
+                            <div style="display:flex; justify-content:space-between; font-size:12px; color:var(--color-text-secondary);">
+                                <span>CR Min: <strong id="crMinVal">0</strong></span>
+                                <span>CR Max: <strong id="crMaxVal">30</strong></span>
+                            </div>
+                            <div class="slider-container">
+                                <div class="slider-track"></div>
+                                <input type="range" id="sliderMin" class="range-input" min="0" max="30" value="0" step="0.125">
+                                <input type="range" id="sliderMax" class="range-input" min="0" max="30" value="30" step="0.125">
+                            </div>
+                        </div>
+                        <div>
+                            <div style="font-size:12px; color:var(--color-text-secondary);">Filter Types:</div>
+                            <div class="type-container" id="typeList"></div>
+                        </div>
+                    </div>
+
+                    <input type="file" id="fileInput" accept=".json" class="hidden-file-input" style="display: none;">
+                    <label for="fileInput" class="btn btn-secondary" style="display: block; text-align: center; margin-top: 10px; width: 100%; cursor: pointer;">
+                        📂 Load Custom JSON
+                    </label>
+                    <div class="monster-list" id="monsterList">
+                        </div>
+                </div>
+
+                <div class="panel right-panel">
+                    <h3>Current Encounter</h3>
+                    <div class="encounter-list" id="encounterList">
+                        <div class="empty-state">No monsters added yet</div>
+                    </div>
+                    
+                    <div class="total-bar">
+                        Total Enemy: <span id="totalCount">0</span>
+                    </div>
+
+                    <button class="btn" style="width: 100%; margin-top: 10px;" onclick="sendToMap()">
+                        Send to Active Map
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <div id="tab-stats" class="tab-content" style="display: none;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+                <p style="color: var(--color-text-secondary);">Stat blocks for monsters sent to the map.</p>
+                <button class="btn btn-secondary" onclick="clearSentHistory()">🗑️ Clear History</button>
+            </div>
+            <div id="activeStatsContainer" class="stat-block-container">
+                <div style="grid-column: 1/-1; text-align: center; color: #666; padding: 40px;">
+                    No monsters sent yet. Go to Builder and send some!
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal-overlay" id="statModal" onclick="closeStatModal(event)">
+        <div class="stat-block" id="statContent" onclick="event.stopPropagation()">
+            <button class="close-modal-btn" onclick="closeStatModal()">✕</button>
+            <div id="statBody">
+                </div>
+        </div>
+    </div>
+
+    <script>
+        const broadcast = new BroadcastChannel('dakons_channel');
+        let allMonsters = [];
+        let currentEncounter = [];
+        let selectedTypes = [];
+        let sentMonstersHistory = [];
+        let currentFilteredMonsters = [];
+        
+
+        const monsterListEl = document.getElementById('monsterList');
+        const encounterListEl = document.getElementById('encounterList');
+        const searchBar = document.getElementById('searchBar');
+        const sourceFilter = document.getElementById('sourceFilter');
+        const fileInput = document.getElementById('fileInput');
+        const totalCountEl = document.getElementById('totalCount');
+        const statModal = document.getElementById('statModal');
+        const statBody = document.getElementById('statBody');
+        const sliderMin = document.getElementById('sliderMin');
+        const sliderMax = document.getElementById('sliderMax');
+        const crMinVal = document.getElementById('crMinVal');
+        const crMaxVal = document.getElementById('crMaxVal');
+        const typeListEl = document.getElementById('typeList');
+
+        window.addEventListener('DOMContentLoaded', () => {
+
+            switchTab('builder');
+
+            fetch('MonsterData.json')
+                .then(r => r.ok ? r.json() : Promise.reject())
+                .then(processMonsterData)
+                .catch(() => {
+                    monsterListEl.innerHTML = `<div style="padding: 20px; text-align: center; color: #e74c3c;">
+                        Auto-load failed. Use "Load JSON" button.
+                    </div>`;
+                });
+        });
+
+        // --- 1. SMART FILE LOADER & NORMALIZER ---
+        // --- THE "DETECTIVE" FILE LOADER ---
+        fileInput.addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            
+            reader.onload = (ev) => {
+                try { 
+                    const rawData = JSON.parse(ev.target.result);
+                    let dataToProcess = [];
+
+                    // KASUS 1: JSON langsung berupa Array [...]
+                    if (Array.isArray(rawData)) {
+                        console.log("Format terdeteksi: Array Langsung");
+                        dataToProcess = rawData;
+                    } 
+                    // KASUS 2: JSON berupa Object {...}
+                    else if (typeof rawData === 'object' && rawData !== null) {
+                        
+                        // A. Cek kunci umum (results, monsters, data, dll)
+                        const commonKeys = ['results', 'monsters', 'data', 'items', 'bestiary', 'monster'];
+                        for (const key of commonKeys) {
+                            if (Array.isArray(rawData[key])) {
+                                console.log(`Format terdeteksi: Wrapper Key '${key}'`);
+                                dataToProcess = rawData[key];
+                                break;
+                            }
+                        }
+
+                        // B. Kalau masih kosong, mungkin ini Dictionary/Map?
+                        // { "001": {name: "A"}, "002": {name: "B"} }
+                        if (dataToProcess.length === 0) {
+                            const values = Object.values(rawData);
+                            
+                            // Cek apakah values-nya terlihat seperti monster (punya 'name' atau 'ac')
+                            const potentialMonsters = values.filter(v => v && typeof v === 'object' && (v.name || v.Name || v.ac || v.AC || v["Armor Class"]));
+                            
+                            if (potentialMonsters.length > 5) { // Kalau nemu banyak object mirip monster
+                                console.log("Format terdeteksi: Dictionary / Map Object");
+                                dataToProcess = potentialMonsters;
+                            } 
+                            // C. Atau mungkin Array-nya nyelip di salah satu value object?
+                            else {
+                                const foundArray = values.find(v => Array.isArray(v) && v.length > 0);
+                                if (foundArray) {
+                                    console.log("Format terdeteksi: Hidden Array");
+                                    dataToProcess = foundArray;
+                                }
+                            }
+                        }
+                    }
+
+                    if (dataToProcess.length === 0) {
+                        throw new Error("Isi JSON kosong atau strukturnya alien banget!");
+                    }
+
+                    // Normalisasi data
+                    
+                    processMonsterData(dataToProcess); 
+                    
+                    alert(`Berhasil! ${dataToProcess.length} monster ditemukan. Sekarang jangan ngeluh lagi! 😤`);
+                } 
+                catch (err) { 
+                    console.error("Error Detail:", err);
+                    alert("Gagal Load! Cek Console (F12) buat liat errornya. Pesan: " + err.message); 
+                }
+            };
+            reader.readAsText(file);
+        });
+
+        function normalizeData(data) {
+            return data.filter(m => m && m.name).map(m => {
+                const meta = m.meta || {};
+                const combat = m.combatStats || {};
+                const stats = m.abilityScores || {};
+                const challenge = meta.challenge || {};
+
+                // Helper Capitalize (str -> Str)
+                const cap = (s) => s.charAt(0).toUpperCase() + s.slice(1);
+
+                // Format Saving Throws: { str: 5 } -> "Str +5"
+                const formatMap = (obj) => {
+                    if (!obj) return null;
+                    return Object.entries(obj)
+                        .map(([k, v]) => `${cap(k)} ${v >= 0 ? '+' : ''}${v}`)
+                        .join(', ');
+                };
+
+                // Format List: ["Fire", "Poison"] -> "Fire, Poison"
+                const formatList = (list) => Array.isArray(list) ? list.join(', ') : null;
+
+                // Ambil Immunities dari struktur yang mungkin beda-beda
+                const dmgImmune = formatList(m.damageImmunities || (m.immunities ? m.immunities.damageImmunities : null));
+                const conImmune = formatList(m.conditionImmunities || (m.immunities ? m.immunities.conditionImmunities : null));
+
+                return {
+                    name: m.name,
+                    source: m.source || "Custom DB",
+                    isIncomplete: (!combat.hitPoints || !combat.armorClass),
+
+                    // --- META DATA BARU ---
+                    size: meta.size || "Medium",
+                    type: meta.type || "Unknown",
+                    alignment: meta.alignment || "Unaligned",
+                    cr: challenge.rating || "0",
+                    xp: challenge.xp ? `${challenge.xp.toLocaleString()} XP` : "0 XP",
+                    prof: challenge.proficiencyBonus ? `+${challenge.proficiencyBonus}` : "+2",
+
+                    // --- COMBAT STATS LENGKAP ---
+                    ac: combat.armorClass ? combat.armorClass.value : 10,
+                    acType: combat.armorClass ? combat.armorClass.type : "",
+                    hp: combat.hitPoints ? combat.hitPoints.formula : "10",
+                    hpAvg: combat.hitPoints ? combat.hitPoints.average : 10,
+                    
+                    // Speed (Walk 30 ft., Fly 60 ft.)
+                    speed: combat.speed ? Object.entries(combat.speed)
+                        .map(([k,v]) => k==='walk'? `${v} ft.` : `${cap(k)} ${v} ft.`)
+                        .join(', ') : "30 ft.",
+                    
+                    // Initiative (Penting buat combat!)
+                    init: combat.initiativeModifier ? (combat.initiativeModifier >= 0 ? `+${combat.initiativeModifier}` : combat.initiativeModifier) : "+0",
+
+                    // --- ATTRIBUTES ---
+                    str: stats.str || 10,
+                    dex: stats.dex || 10,
+                    con: stats.con || 10,
+                    int: stats.int || 10,
+                    wis: stats.wis || 10,
+                    cha: stats.cha || 10,
+
+                    // --- SKILLS & SAVES ---
+                    saves: formatMap(m.savingThrows),
+                    skills: formatMap(m.skills),
+                    senses: combat.senses ? Object.entries(combat.senses)
+                        .map(([k,v]) => `${k.replace(/([A-Z])/g, ' $1').trim()} ${v} ft.`)
+                        .join(', ') : "-",
+                    languages: combat.languages ? combat.languages.join(', ') : "-",
+
+                    // --- RESISTANCES & IMMUNITIES ---
+                    vuln: formatList(m.damageVulnerabilities || m.vulnerabilities),
+                    resist: formatList(m.damageResistances || m.resistances),
+                    immune: dmgImmune,
+                    condImmune: conImmune,
+
+                    // --- ACTIONS ---
+                    traits: m.traits || [],
+                    actions: m.actions || [],
+                    bonusActions: m.bonusActions || [],
+                    reactions: m.reactions || [],
+                    legendary: m.legendaryActions || []
+                };
+            });
+        }
+
+        // --- FIX INITIAL LOAD BUG ---
+        function processMonsterData(data) {
+            // 1. Normalize data mentah dari JSON baru biar strukturnya rapi
+            allMonsters = normalizeData(data); 
+
+            // 2. [OPTIONAL TAPI BAGUS] Pre-calculate nilai CR biar filternya enteng
+            // Ini gabungan dari logika kode lamamu
+            if (typeof parseCR === 'function') {
+                allMonsters.forEach(m => {
+                    m._crVal = parseCR(m.cr);
+                });
+            }
+    
+            // 3. [PENTING] Isi currentFilteredMonsters dengan SEMUA monster di awal
+            // Ini solusi buat bug "ga bisa dipencet pas awal buka"
+            currentFilteredMonsters = allMonsters; 
+            
+            // 4. Setup filter & render tampilan awal
+            populateSourceFilter(allMonsters);
+            populateTypeFilter(allMonsters);
+            renderMonsterList(allMonsters);
+        }
+
+        function parseCR(crString) {
+            if (!crString) return 0;
+            const str = String(crString).trim();
+            
+            // Handle pecahan "1/4"
+            if (str.includes('/')) {
+                const [a, b] = str.split('/');
+                return parseFloat(a) / parseFloat(b);
+            }
+            
+            // Handle angka biasa "5" atau "5.0"
+            return parseFloat(str) || 0;
+        }
+
+        function parseCR(crString) {
+            if (!crString) return 0;
+            const str = String(crString).trim();
+            if (str.includes('/')) {
+                const [a, b] = str.split('/');
+                return parseFloat(a) / parseFloat(b);
+            }
+            return parseFloat(str) || 0;
+        }
+
+        function formatCRDisplay(val) {
+            if (val === 0.125) return "1/8";
+            if (val === 0.25) return "1/4";
+            if (val === 0.5) return "1/2";
+            return val;
+        }
+
+        function populateSourceFilter(monsters) {
+            const sources = new Set();
+            monsters.forEach(m => {
+                if (m.sources) sources.add(m.sources);
+            });
+
+            // Reset dan Tambahkan Opsi "All Sources"
+            sourceFilter.innerHTML = '<option value="all">All Sources</option>';
+            
+            Array.from(sources).sort().forEach(src => {
+                const opt = document.createElement('option');
+                opt.value = src;
+                opt.textContent = src;
+                sourceFilter.appendChild(opt);
+            });
+        }
+
+        function populateTypeFilter(monsters) {
+            const types = new Set();
+            monsters.forEach(m => {
+                if (m.type && m.type !== "Unknown") {
+                    // 1. Lowercase semua
+                    let raw = m.type.toLowerCase();
+
+                    // 2. Buang isi dalam kurung (misal "Fiend (Demon)" -> "Fiend ")
+                    raw = raw.split('(')[0];
+
+                    // 3. Buang koma (misal "Humanoid, Shapechanger" -> "Humanoid")
+                    raw = raw.split(',')[0];
+
+                    // 4. Ambil kata pertama saja (misal "Fey Fey" -> "Fey")
+                    // Regex ini cuma ambil huruf a-z, jadi angka/simbol "Abberation1" -> "Abberation"
+                    const match = raw.match(/[a-z]+/); 
+                    
+                    if (match) {
+                        let cleanType = match[0];
+                        // 5. Capitalize (huruf depan besar)
+                        cleanType = cleanType.charAt(0).toUpperCase() + cleanType.slice(1);
+                        
+                        // Masukkan ke Set (otomatis buang duplikat)
+                        types.add(cleanType);
+                    }
+                }
+            });
+
+            typeListEl.innerHTML = '';
+            // Sort abjad biar rapi
+            Array.from(types).sort().forEach(type => {
+                const pill = document.createElement('div');
+                pill.className = 'type-pill';
+                pill.textContent = type;
+                pill.onclick = () => toggleType(type, pill);
+                typeListEl.appendChild(pill);
+            });
+        }
+
+        function toggleType(type, element) {
+            if (selectedTypes.includes(type)) {
+                selectedTypes = selectedTypes.filter(t => t !== type);
+                element.classList.remove('active');
+            } else {
+                selectedTypes.push(type);
+                element.classList.add('active');
+            }
+            filterMonsters();
+        }
+
+        function updateSlider() {
+            let min = parseFloat(sliderMin.value);
+            let max = parseFloat(sliderMax.value);
+
+            // Mencegah overlap (Min gak boleh lebih gede dari Max)
+            if (min > max) {
+                const tmp = min; min = max; max = tmp;
+                sliderMin.value = min; sliderMax.value = max;
+            }
+
+            crMinVal.textContent = formatCRDisplay(min);
+            crMaxVal.textContent = formatCRDisplay(max);
+            
+            filterMonsters();
+        }
+
+        sliderMin.addEventListener('input', updateSlider);
+        sliderMax.addEventListener('input', updateSlider);
+
+        function renderMonsterList(monsters) {
+            monsterListEl.innerHTML = '';
+            
+            // [FIX 1] HAPUS LIMIT! Biarkan semua monster muncul walau agak berat dikit.
+            // const limit = ... (HAPUS BARIS INI)
+            
+            let count = 0;
+            // Gunakan index (i) biar gak salah panggil monster kembar
+            monsters.forEach((m, i) => { 
+                // Logika Tanda Peringatan
+                const warningIcon = m.isIncomplete 
+                    ? `<span title="Data Stat Tidak Lengkap (Cuma Lore/Kosong)" style="cursor:help; color:orange;">⚠️</span>` 
+                    : ``;
+
+                const nameStyle = m.isIncomplete ? 'color: #a0a0a0;' : '';
+
+                const div = document.createElement('div');
+                div.className = 'monster-row';
+                
+                // [FIX 2] Tampilkan Source di bawah nama biar jelas
+                // [FIX 3] Onclick sekarang kirim INDEX (i), bukan nama!
+                div.innerHTML = `
+                    <div class="clickable-name" style="${nameStyle}" onclick="openStatBlock(${i})">
+                        ${m.name} ${warningIcon}
+                        <div style="font-size:10px; color:#666; font-weight:normal;">${m.sources}</div>
+                    </div>
+                    <div style="font-size:12px; color:#aaa;">${m.type}</div>
+                    <div style="font-size:12px;">${m.size || '-'}</div>
+                    <div style="font-size:12px;">${m.cr || '?'}</div>
+                    <div><button class="btn" onclick="addToEncounter(${i})">+</button></div>
+                `;
+                monsterListEl.appendChild(div);
+                count++;
+            });
+
+            if (count === 0) monsterListEl.innerHTML = '<div style="padding:20px; text-align:center;">No monsters found.</div>';
+        }
+
+        function filterMonsters() {
+            const query = searchBar.value.toLowerCase();
+            const source = sourceFilter.value;
+            const minCR = parseFloat(sliderMin.value);
+            const maxCR = parseFloat(sliderMax.value);
+
+            // Filter dari allMonsters
+            const filtered = allMonsters.filter(m => {
+                const matchName = m.name.toLowerCase().includes(query);
+                const matchSource = (source === 'all') || (m.sources === source);
+                const matchCR = (m.cr !== undefined) && (parseCR(m.cr) >= minCR) && (parseCR(m.cr) <= maxCR); // Gunakan helper CR parse kalau perlu, atau m.cr langsung kalau formatnya desimal
+                
+                // Note: Pastikan m.cr yang desimal dipakai bandingkan.
+                // Kalau di normalizeData m.cr itu string "1/4", kamu butuh m._crVal (kalau ada) atau parse ulang.
+                // Asumsi normalizeData kamu return m.cr sebagai string, dan kamu punya helper parseCR.
+                // Biar aman, pakai logic CR lama kamu:
+                const crVal = parseCR(m.cr); 
+                const matchCRSafe = (crVal >= minCR) && (crVal <= maxCR);
+
+                let matchType = true;
+                if (selectedTypes.length > 0) {
+                    const monType = (m.type || '').toLowerCase();
+                    matchType = selectedTypes.some(t => monType.includes(t.toLowerCase()));
+                }
+
+                return matchName && matchSource && matchCRSafe && matchType;
+            });
+
+            // SIMPAN HASIL FILTER KE GLOBAL
+            currentFilteredMonsters = filtered;
+
+            // Render hasil filter
+            renderMonsterList(filtered);
+        }
+
+        searchBar.addEventListener('input', filterMonsters);
+        sourceFilter.addEventListener('change', filterMonsters);
+
+        // --- STAT BLOCK LOGIC ---
+        function openStatBlock(index) {
+            // Ambil data monster dari list yang sedang tampil di layar
+            const m = currentFilteredMonsters[index]; 
+            
+            if (!m) return; // Kalau datanya gak ketemu, stop.
+
+            // Helper hitung modifier (misal 16 jadi +3)
+            const getMod = (score) => {
+                if(!score) return '-';
+                const mod = Math.floor((score - 10) / 2);
+                return mod >= 0 ? `+${mod}` : mod;
+            };
+
+            // Masukkan data ke dalam HTML Modal
+            statBody.innerHTML = `
+                <h2>${m.name}</h2>
+                <div class="meta">${m.size} ${m.type}, ${m.alignment}</div>
+                <div class="red-line"></div>
+                
+                <div class="property-line"><strong>Armor Class</strong> ${m.ac || 10}</div>
+                <div class="property-line"><strong>Hit Points</strong> ${m.hp || 'Unknown'}</div>
+                <div class="property-line"><strong>Speed</strong> ${m.speed || '30 ft.'}</div>
+                
+                <div class="red-line"></div>
+                <div class="stat-grid">
+                    <div class="stat-box"><strong>STR</strong><span class="stat-val">${m.str || 10}</span><span>(${getMod(m.str || 10)})</span></div>
+                    <div class="stat-box"><strong>DEX</strong><span class="stat-val">${m.dex || 10}</span><span>(${getMod(m.dex || 10)})</span></div>
+                    <div class="stat-box"><strong>CON</strong><span class="stat-val">${m.con || 10}</span><span>(${getMod(m.con || 10)})</span></div>
+                    <div class="stat-box"><strong>INT</strong><span class="stat-val">${m.int || 10}</span><span>(${getMod(m.int || 10)})</span></div>
+                    <div class="stat-box"><strong>WIS</strong><span class="stat-val">${m.wis || 10}</span><span>(${getMod(m.wis || 10)})</span></div>
+                    <div class="stat-box"><strong>CHA</strong><span class="stat-val">${m.cha || 10}</span><span>(${getMod(m.cha || 10)})</span></div>
+                </div>
+                <div class="red-line"></div>
+
+                <div class="property-line"><strong>Senses</strong> ${m.senses || '-'}</div>
+                <div class="property-line"><strong>Languages</strong> ${m.languages || '-'}</div>
+                <div class="property-line"><strong>Challenge</strong> ${m.cr || '0'}</div>
+                
+                <div class="red-line"></div>
+                <div style="margin-top:8px; font-style:italic; font-size:12px; color:#888;">
+                Source: ${m.sources || 'Unknown'}
+                </div>
+            `;
+
+            // Munculkan jendela modal
+            statModal.classList.add('active');
+        }
+
+        function closeStatModal(e) {
+            // Kalau klik overlay atau tombol close
+            if (!e || e.target === statModal || e.target.classList.contains('close-modal-btn')) {
+                statModal.classList.remove('active');
+            }
+        }
+
+        // --- ENCOUNTER LOGIC ---
+        function addToEncounter(index) {
+            const monster = currentFilteredMonsters[index]; // Ambil dari list yang tampil
+            if (!monster) return;
+
+            // Cari apakah monster ini udah ada di encounter (Cek nama saja gpp buat grouping)
+            const existingIndex = currentEncounter.findIndex(m => m.name === monster.name);
+            
+            if (existingIndex !== -1) {
+                currentEncounter[existingIndex].qty += 1;
+            } else {
+                currentEncounter.push({ ...monster, qty: 1 });
+            }
+            renderEncounter();
+        }
+
+        function updateQty(index, change) {
+            if (currentEncounter[index]) {
+                currentEncounter[index].qty += change;
+                if (currentEncounter[index].qty <= 0) currentEncounter.splice(index, 1);
+                renderEncounter();
+            }
+        }
+
+        function renderEncounter() {
+            encounterListEl.innerHTML = '';
+            let totalEnemies = 0;
+            currentEncounter.forEach((m, index) => {
+                totalEnemies += m.qty;
+                const div = document.createElement('div');
+                div.className = 'encounter-item';
+                div.innerHTML = `
+                    <div class="encounter-info">
+                        <strong>${m.name}</strong>
+                        <span class="encounter-meta">${m.size} • CR ${m.cr}</span>
+                    </div>
+                    <div class="qty-controls">
+                        <button class="qty-btn" onclick="updateQty(${index}, -1)">−</button>
+                        <span class="qty-val">${m.qty}</span>
+                        <button class="qty-btn" onclick="updateQty(${index}, 1)">+</button>
+                    </div>
+                `;
+                encounterListEl.appendChild(div);
+            });
+            totalCountEl.textContent = totalEnemies;
+            if (currentEncounter.length === 0) {
+                encounterListEl.innerHTML = `
+                <div style="padding: 20px; text-align: center; color: #666; font-size: 13px;">
+                    Click '+' on the left to add monsters
+                </div>`;
+            }
+        }
+
+        function sendToMap() {
+            if (currentEncounter.length === 0) {
+                alert("Baka! Listnya kosong, apa yang mau dikirim? 😤");
+                return;
+            }
+
+            // 1. Kirim ke Map
+            broadcast.postMessage({
+                type: 'IMPORT_ENCOUNTER',
+                data: currentEncounter
+            });
+
+            // 2. Simpan ke History (Stat Block Tab) - HANYA JENIS YANG UNIK
+            currentEncounter.forEach(m => {
+                // Cek apakah monster dengan nama ini udah ada di history?
+                const exists = sentMonstersHistory.find(h => h.name === m.name);
+                if (!exists) {
+                    sentMonstersHistory.push(m);
+                }
+            });
+            renderActiveStats(); // Update tampilan tab sebelah
+
+            // 3. FIX: Clear Current List & Render Ulang
+            currentEncounter = [];
+            renderEncounter();
+
+            // 4. Feedback
+            alert(`Sent! Cek tab "Active Stats" buat lihat detailnya.`);
+        }
+
+        function clearSentHistory() {
+            if(confirm('Clear all stat blocks?')) {
+                sentMonstersHistory = [];
+                renderActiveStats();
+            }
+        }
+
+        function renderActiveStats() {
+            const container = document.getElementById('activeStatsContainer');
+            
+            if (sentMonstersHistory.length === 0) {
+                container.innerHTML = '<div style="grid-column: 1/-1; text-align: center; color: #666; padding: 40px;">Belum ada monster yang dikirim ke map.</div>';
+                return;
+            }
+
+            container.innerHTML = sentMonstersHistory.map(m => {
+                // Helper Modifier (+3, -1)
+                const mod = (val) => {
+                    const m = Math.floor((val - 10) / 2);
+                    return m >= 0 ? `+${m}` : m;
+                };
+
+                // Helper Baris Info (Cuma muncul kalau datanya ada)
+                const infoLine = (label, val) => val ? `<div class="stat-line"><strong>${label}</strong> ${val}</div>` : '';
+
+                // Helper Section Render
+                const renderSection = (title, items) => {
+                    if (!items || items.length === 0) return '';
+                    return `
+                        <div class="stat-divider"></div>
+                        <div class="section-title">${title}</div>
+                        ${items.map(i => `
+                            <div class="action-item" style="margin-bottom: 8px;">
+                                <span class="action-name"><strong>${i.name}.</strong></span> 
+                                ${i.type ? `<i>(${i.type})</i> ` : ''}
+                                <span class="stat-text">${i.description}</span>
+                            </div>
+                        `).join('')}
+                    `;
+                };
+
+                return `
+                <div class="stat-card">
+                    <div class="stat-header">
+                        <div class="stat-name">${m.name}</div>
+                        <div class="stat-meta">${m.size} ${m.type}, ${m.alignment}</div>
+                    </div>
+                    
+                    <div class="stat-divider"></div>
+                    
+                    <div class="stat-grid-2">
+                        <div><strong>AC</strong> ${m.ac} <span style="font-size:11px; color:#666;">(${m.acType})</span></div>
+                        <div><strong>HP</strong> ${m.hpAvg} <span style="font-size:11px; color:#666;">(${m.hp})</span></div>
+                        <div><strong>Spd</strong> ${m.speed}</div>
+                        <div><strong>Init</strong> ${m.init} &nbsp;|&nbsp; <strong>Prof</strong> ${m.prof}</div>
+                    </div>
+                    
+                    <div class="stat-divider"></div>
+                    
+                    <div class="stat-attr">
+                        <div class="attr-box"><div class="attr-name">STR</div><div class="attr-val">${m.str} (${mod(m.str)})</div></div>
+                        <div class="attr-box"><div class="attr-name">DEX</div><div class="attr-val">${m.dex} (${mod(m.dex)})</div></div>
+                        <div class="attr-box"><div class="attr-name">CON</div><div class="attr-val">${m.con} (${mod(m.con)})</div></div>
+                        <div class="attr-box"><div class="attr-name">INT</div><div class="attr-val">${m.int} (${mod(m.int)})</div></div>
+                        <div class="attr-box"><div class="attr-name">WIS</div><div class="attr-val">${m.wis} (${mod(m.wis)})</div></div>
+                        <div class="attr-box"><div class="attr-name">CHA</div><div class="attr-val">${m.cha} (${mod(m.cha)})</div></div>
+                    </div>
+                    
+                    <div class="stat-divider"></div>
+                    
+                    ${infoLine("Saves", m.saves)}
+                    ${infoLine("Skills", m.skills)}
+                    ${infoLine("Vuln", m.vuln)}
+                    ${infoLine("Resist", m.resist)}
+                    ${infoLine("Immune", m.immune)}
+                    ${infoLine("Condition", m.condImmune)}
+                    ${infoLine("Senses", m.senses)}
+                    ${infoLine("Languages", m.languages)}
+                    
+                    <div class="stat-line">
+                        <strong>Challenge</strong> ${m.cr} <span style="color:#666;">(${m.xp})</span>
+                    </div>
+                    
+                    ${renderSection('Traits', m.traits)}
+                    ${renderSection('Actions', m.actions)}
+                    ${renderSection('Bonus Actions', m.bonusActions)}
+                    ${renderSection('Reactions', m.reactions)}
+                    ${renderSection('Legendary Actions', m.legendary)}
+                    
+                    <div style="margin-top:10px; font-size:10px; color:#888; text-align:right;">Source: ${m.source}</div>
+                </div>
+                `;
+            }).join('');
+        }
+
+        // --- TAB SWITCHING LOGIC (INI KETINGGALAN!) ---
+        // --- TAB SWITCHING LOGIC (UPDATED FOR LAYOUT FIX) ---
+        function switchTab(tabName) {
+            const tabBuilder = document.getElementById('tab-builder');
+            const tabStats = document.getElementById('tab-stats');
+
+            // Reset display
+            tabBuilder.style.display = 'none';
+            tabStats.style.display = 'none';
+            
+            // Reset tombol active
+            document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+            
+            // Logic Tampilan Baru
+            if (tabName === 'builder') {
+                tabBuilder.style.display = 'block'; // Builder tetap block biasa
+                document.querySelectorAll('.tab-btn')[0].classList.add('active');
+            } else {
+                // [FIX UTAMA DISINI] 
+                // Stat Tab harus FLEX biar anak-anaknya (kartu monster) bisa scroll di dalam!
+                tabStats.style.display = 'flex'; 
+                tabStats.style.flexDirection = 'column'; 
+                document.querySelectorAll('.tab-btn')[1].classList.add('active');
+            }
+        }
+
+    </script>
+</body>
+</html>
