@@ -996,6 +996,22 @@
         .section-content::-webkit-scrollbar-thumb { background: var(--color-primary); border-radius: 3px; }
         .section-content::-webkit-scrollbar-track { background: rgba(0,0,0,0.1); }
 
+        .toast-container {
+            position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%);
+            z-index: 9999; display: flex; flex-direction: column; gap: 10px; pointer-events: none;
+        }
+        .toast {
+            background: rgba(20, 20, 20, 0.9); color: #fff;
+            padding: 10px 20px; border-radius: 20px;
+            border: 1px solid var(--color-primary);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+            font-size: 14px; opacity: 0; transform: translateY(20px);
+            transition: all 0.3s ease;
+            display: flex; align-items: center; gap: 8px;
+        }
+        .toast.show { opacity: 1; transform: translateY(0); }
+        .toast-icon { font-size: 18px; }
+
     </style>
 </head>
 <body>
@@ -1274,9 +1290,26 @@
     </div>
 
     <input type="file" id="fileInput" accept="image/*">
+    <div class="toast-container" id="toastContainer"></div>
 
     <script>
         // --- RECEIVER LOGIC (WALKIE TALKIE) ---
+        function showToast(message, icon = 'ℹ️') {
+            const container = document.getElementById('toastContainer');
+            const el = document.createElement('div');
+            el.className = 'toast';
+            el.innerHTML = `<span class="toast-icon">${icon}</span><span>${message}</span>`;
+            container.appendChild(el);
+            
+            // Animasi Masuk
+            requestAnimationFrame(() => el.classList.add('show'));
+            
+            // Hilang setelah 3 detik
+            setTimeout(() => {
+                el.classList.remove('show');
+                setTimeout(() => el.remove(), 300);
+            }, 3000);
+        }
         let lastImportTime = 0;
         let selectionBox = null;
         let isSelecting = false;
@@ -1325,7 +1358,7 @@
             lastImportTime = now;
 
             if (!state.currentImage) {
-                alert("Baka! Upload map dulu sebelum kirim musuh!");
+                showToast("Baka! Upload map dulu sebelum kirim musuh!");
                 return;
             }
             
@@ -1398,7 +1431,7 @@
             });
             
             renderImage();
-            alert(`Diterima! ${added} musuh mendarat.`);
+            showToast(`Diterima! ${added} musuh mendarat.`);
             
             // Refresh Battle Tracker kalau lagi kebuka
             if (battleTracker.style.display !== 'none') {
@@ -2078,6 +2111,7 @@
                 restoreViewState(state.currentImage);
                 
                 renderImage();
+                if (isHost) broadcastMap();
             } else {
                 state.selectedPinId = pinId;
                 state.mode = 'add-image';
@@ -2104,6 +2138,7 @@
                 state.selectedPinId = null;
                 state.showingAltImage = false;
                 renderImage();
+                if (isHost) broadcastMap();
             }
         }
 
@@ -2165,6 +2200,11 @@
             // 2. LOGIC TOKEN DRAG & CLICK (PERBAIKAN DISINI)
             const tokenEl = e.target.closest('.token');
             if (tokenEl) {
+                const type = tokenEl.classList.contains('token-player') ? 'player' : 'enemy';
+                if (!isHost && type !== 'player') {
+                    showToast("Hei! Kamu bukan DM, jangan sentuh monster!", "🚫");
+                    return; 
+                }
                 e.preventDefault();
                 e.stopPropagation();
                 const tokenId = parseFloat(tokenEl.dataset.tokenId);
@@ -2355,7 +2395,12 @@
                 
                 renderImage(); 
 
-                if (isHost) broadcastUpdate();
+                if (isHost) {
+                    broadcastUpdate();
+                }
+                else {
+                    sendMoveToHost();
+                }
                 return;
             }
 
@@ -2400,9 +2445,9 @@
                 a.click();
                 document.body.removeChild(a);
                 URL.revokeObjectURL(url);
-                alert('✅ Project saved!');
+                showToast('✅ Project saved!');
             } catch (e) {
-                alert('❌ Error while saving');
+                showToast('❌ Error while saving');
             }
         }
 
@@ -2447,13 +2492,13 @@
                                 setTimeout(() => {
                                     setInteractionMode('pin'); 
                                 }, 100);
-                                alert('✅ Project loaded!');
+                                showToast('✅ Project loaded!');
                             } else {
-                                alert('❌ No valid data found');
+                                showToast('❌ No valid data found');
                             }
                         } catch (err) {
                             console.error(err);
-                            alert('❌ Error loading file');
+                            showToast('❌ Error loading file');
                         }
                     };
                     reader.readAsText(file);
@@ -2666,7 +2711,7 @@
                 cha: document.getElementById('statCha').value
             };
 
-            if (!name) { alert("Nama karakter wajib diisi!"); return; }
+            if (!name) { showToast("Nama karakter wajib diisi!"); return; }
 
             // 4. Simpan ke Object Player Lengkap
             const playerData = {
@@ -3084,7 +3129,7 @@
                 // Opsional: Kasih notif kecil
                 // alert(`🎲 ${rolledCount} monster baru telah di-roll!`);
             } else {
-                alert("Semua monster sudah punya initiative! Reset dulu kalau mau roll ulang.");
+                showToast("Semua monster sudah punya initiative! Reset dulu kalau mau roll ulang.");
             }
         }
 
@@ -3353,7 +3398,7 @@
             });
 
             peer.on('error', (err) => {
-                alert("P2P Error: " + err.type);
+                showToast("P2P Error: " + err.type);
             });
         }
 
@@ -3364,7 +3409,7 @@
 
         function connectToHost() {
             const hostId = document.getElementById('hostIdInput').value.trim();
-            if(!hostId) return alert("Isi ID dulu baka!");
+            if(!hostId) return showToast("Isi ID dulu baka!");
 
             document.getElementById('lobbyStatus').innerText = "Mencari Host...";
             
@@ -3386,7 +3431,7 @@
                     setupPlayerListener(conn);
                 });
 
-                conn.on('error', (err) => alert("Gagal connect: " + err));
+                conn.on('error', (err) => showToast("Gagal connect: " + err));
             });
         }
 
@@ -3402,39 +3447,57 @@
             document.body.classList.add('player-mode');
             
             // Opsional: Kasih tau user
-            alert("Kamu masuk sebagai Player. Tunggu DM mengirim Map.");
+            showToast("Kamu masuk sebagai Player. Tunggu DM mengirim Map.");
         }
 
         function copyRoomId() {
             const id = document.getElementById('myRoomId').innerText;
             navigator.clipboard.writeText(id);
-            alert("ID Copied: " + id);
+            showToast("ID Copied: " + id);
         }
 
         // 4. LISTENER DATA (Jantungnya Sinkronisasi)
         // Ini yang nanti bakal kita isi logic kirim-kiriman Map & Token
+        function sendMoveToHost() {
+            if (!myConn || !myConn.open) return;
+            
+            const myTokens = state.currentImage.tokens.filter(t => t.type === 'player');
+            
+            myConn.send({
+                type: 'CLIENT_MOVE',
+                tokens: myTokens // Kirim posisi token player terbaru
+            });
+        }
+
+        // 2. Host Menerima Laporan (Update `setupConnection`)
+        // GANTI fungsi setupConnection yang lama dengan ini:
         function setupConnection(conn) {
             connectedPlayers.push(conn);
-
             conn.on('open', () => {
-                 console.log("Player Connected!");
-                 // [TAMBAHAN] Langsung kirim map ke orang ini!
-                 setTimeout(() => broadcastMap(conn), 1000); // Kasih delay dikit biar koneksi stabil
+                 showToast("Player Connected!", "👋");
+                 setTimeout(() => broadcastMap(conn), 1000); 
             });
-            console.log("Player Joined: " + conn.peer);
-            
+
             conn.on('data', (data) => {
-                console.log("Data from player:", data);
-                // Nanti kita handle input player disini
+                // KASUS: Player Gerakin Token
+                if (data.type === 'CLIENT_MOVE') {
+                    // Update posisi token yang digerakkan player di map Host
+                    data.tokens.forEach(pToken => {
+                        const hToken = findTokenById(state.currentImage, pToken.id);
+                        if (hToken) {
+                            hToken.x = pToken.x;
+                            hToken.y = pToken.y;
+                        }
+                    });
+                    renderImage(); // Host update tampilan
+                    broadcastUpdate(); // Host kasih tau player LAIN (biar sinkron semua)
+                }
             });
 
             conn.on('close', () => {
-                alert("Player disconnected!");
+                showToast("Player Disconnected", "❌");
                 connectedPlayers = connectedPlayers.filter(c => c !== conn);
             });
-            
-            // [TODO NEXT STEP] Kirim Map & State saat ini ke Player baru!
-            // sendFullStateToPlayer(conn); 
         }
 
         function setupPlayerListener(conn) {
@@ -3460,7 +3523,7 @@
                     document.documentElement.style.setProperty('--grid-size', state.gridSize + 'px');
 
                     renderImage();
-                    alert("DM just updated the map!");
+                    showToast("DM just updated the map!");
                 }
 
                 // KASUS 2: TERIMA UPDATE GERAKAN (Ringan)
