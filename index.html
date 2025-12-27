@@ -1619,20 +1619,32 @@
                 });
             });
 
-            gridToggle.addEventListener('change', (e) => {
+           gridToggle.addEventListener('change', (e) => {
                 state.showGrid = e.target.checked;
                 updateGrid();
+                
+                // [FIX UTAMA] Lapor ke Player detik itu juga!
+                if (isHost) {
+                    console.log("📡 Grid Toggled, Broadcasting...");
+                    broadcastUpdate(); 
+                }
             });
+
             gridSizeInput.addEventListener('input', (e) => {
                 const val = parseInt(e.target.value) || 35;
                 state.gridSize = val;
                 
-                // MAGIC HAPPENS HERE: Update variabel global CSS
+                // 1. Update CSS Variable Lokal (Host)
                 document.documentElement.style.setProperty('--grid-size', val + 'px');
                 
                 updateGrid();
 
-                if (isHost) broadcastUpdate()
+                // 2. [FIX UTAMA] Lapor ke Player secara Realtime!
+                if (isHost) {
+                    // Kita pakai teknik sederhana: Kirim terus! 
+                    // (PeerJS cukup cepat buat handle teks kecil gini)
+                    broadcastUpdate();
+                }
             });
 
             imageContainer.addEventListener('click', handleImageClick);
