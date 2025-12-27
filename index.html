@@ -1011,6 +1011,36 @@
         .toast.show { opacity: 1; transform: translateY(0); }
         .toast-icon { font-size: 18px; }
 
+        .rolling-overlay {
+            position: absolute;
+            right: 10px; top: 50%; transform: translateY(-50%);
+            background: linear-gradient(135deg, #e74c3c, #c0392b);
+            color: white; padding: 4px 12px;
+            border-radius: 4px; border: 2px solid #fff;
+            font-weight: bold; font-family: 'Courier New', monospace;
+            box-shadow: 0 0 10px rgba(231, 76, 60, 0.8);
+            z-index: 10;
+            display: flex; align-items: center; gap: 5px;
+            
+            /* Animasi Muncul */
+            animation: popIn 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+
+        @keyframes popIn {
+            from { transform: translateY(-50%) scale(0); opacity: 0; }
+            to { transform: translateY(-50%) scale(1); opacity: 1; }
+        }
+
+        /* Kalo lagi mode Player, tombol Close (X) di Battle Tracker ILANG */
+        body.player-mode .floating-panel .close-btn { 
+            display: none !important; 
+        }
+
+        /* Player gak boleh liat stat musuh di Battle Tracker */
+        body.player-mode .battle-enemy-stats {
+            display: none !important;
+        }
+
     </style>
 </head>
 <body>
@@ -3106,11 +3136,13 @@
             } else {
                 renderBattleListUI(); 
             }
+            if (isHost) broadcastUpdate();
         }
 
         function closeBattleTracker() {
             // Cabut class active -> Otomatis animasi menghilang jalan
             battleTracker.classList.remove('active');
+            if (isHost) broadcastUpdate();
         }
 
         function toggleBattleBody() {
@@ -3147,36 +3179,97 @@
     
 
         // Dummy Functions (Nanti kita isi logicnya)
+        // --- CINEMATIC ROLL INITIATIVE ---
         function rollAllInitiative() {
             if (!state.currentImage || state.currentImage.tokens.length === 0) return;
 
-            let rolledCount = 0;
+            const enemies = state.combatants.filter(t => t.type !== 'player');
+            if (enemies.length === 0) return;
 
-            state.combatants.forEach(token => {
-                // SKIP PLAYER (Mereka input manual)
-                if (token.type === 'player') return;
+            // Kunci tombol biar gak dipencet 2x pas lagi animasi
+            const btn = document.querySelector('#battleTracker .panel-footer button');
+            if(btn) btn.disabled = true;
 
-                // SKIP YANG SUDAH PUNYA NILAI (Biar monster lama gak ke-reset)
-                // Kita anggap sudah punya nilai kalau defined dan bukan '-'
+            // 1. ANIMASI ROLL
+            let completed = 0;
+            
+            enemies.forEach(token => {
+                // Cuma roll yang belum punya nilai (atau paksa roll semua kalau mau)
                 if (token.initiativeTotal !== undefined && token.initiativeTotal !== '-') return;
 
-                // LOGIC ROLL: D20 + Init Stat
-                // [FIX] Pakai 'init' stat langsung sesuai request
-                const mod = parseInt(token.stats?.init || 0); 
-                const roll = Math.floor(Math.random() * 20) + 1;
+                // Cari elemen HTML-nya di list
+                // Kita cari berdasarkan nama karena ID di list mungkin beda struktur DOM-nya
+                // (Cara paling aman: Render ulang list dengan ID khusus dulu, tapi ini shortcut)
+                const domItems = document.querySelectorAll('.battle-item');
+                let targetItem = null;
                 
-                token.initiativeTotal = roll + mod;
-                rolledCount++;
-            });
+                // Cari elemen DOM yang sesuai token ini
+                domItems.forEach(el => {
+                    if(el.querySelector('.battle-item-name').textContent === token.name) {
+                        targetItem = el;
+                    }
+                });
 
-            // Kalau ada perubahan, sortir ulang
-            if (rolledCount > 0) {
+                if (targetItem) {
+                    // Inject Kotak Animasi
+                    const mod = parseInt(token.stats?.init || 0);
+                    const modStr = mod >= 0 ? `+${mod}` : mod;
+                    
+                    const overlay = document.createElement('div');
+                    overlay.className = 'rolling-overlay';
+                    targetItem.style.position = 'relative'; // Biar overlay posisinya pas
+                    targetItem.appendChild(overlay);
+
+                    // Efek Angka Acak (Slot Machine Effect)
+                    let steps = 0;
+                    const interval = setInterval(() => {
+                        const randomD20 = Math.floor(Math.random() * 20) + 1;
+                        overlay.innerHTML = `🎲 ${randomD20} <span style="font-size:10px; opacity:0.7">(${modStr})</span>`;
+                        steps++;
+                        
+                        // Berhenti setelah 20 frame (sekitar 1 detik)
+                        if (steps > 20) {
+                            clearInterval(interval);
+                            
+                            // Hitung Hasil Akhir
+                            const finalRoll = Math.floor(Math.random() * 20) + 1;
+                            const total = finalRoll + mod;
+                            token.initiativeTotal = total; // Simpan ke data
+                            
+                            // Tampilkan Hasil Akhir (Warna Emas/Hijau)
+                            overlay.style.background = '#2ecc71';
+                            overlay.style.borderColor = '#27ae60';
+                            overlay.innerHTML = `<strong>${total}</strong>`;
+                            
+                            // Hapus kotak setelah dilihat sebentar
+                            setTimeout(() => {
+                                overlay.style.transition = 'opacity 0.3s, transform 0.3s';
+                                overlay.style.opacity = '0';
+                                overlay.style.transform = 'translateY(-50%) scale(2)'; // Efek "Poof"
+                                setTimeout(() => overlay.remove(), 300);
+                                
+                                completed++;
+                                // Kalau semua musuh sudah selesai roll -> SORTIR & FINAL UPDATE
+                                if (completed >= enemies.length) {
+                                    finishRolling();
+                                }
+                            }, 800);
+                        }
+                    }, 50); // Kecepatan ganti angka (50ms)
+                } else {
+                    // Fallback kalau DOM gak ketemu (jarang terjadi)
+                    const roll = Math.floor(Math.random() * 20) + 1;
+                    token.initiativeTotal = roll + parseInt(token.stats?.init || 0);
+                    completed++;
+                }
+            });
+            
+            // Fungsi finalisasi setelah animasi kelar
+            function finishRolling() {
                 sortCombatants();
                 renderBattleListUI();
-                // Opsional: Kasih notif kecil
-                // alert(`🎲 ${rolledCount} monster baru telah di-roll!`);
-            } else {
-                showToast("Semua monster sudah punya initiative! Reset dulu kalau mau roll ulang.");
+                if(btn) btn.disabled = false;
+                if(isHost) broadcastUpdate(); // Kirim hasil akhir ke Player
             }
         }
 
@@ -3279,18 +3372,59 @@
                 const isActive = (index === state.currentTurnIndex) ? 'active-turn' : '';
                 const activeStyle = isActive ? 'border-left: 4px solid #2ecc71; background: rgba(46, 204, 113, 0.2);' : '';
                 
-                // Setup MaxHP buat display (contoh: 15 / 20)
+                // Logic HP/AC/Init buat Tampilan
                 const currentHP = t.stats?.hp || 0;
-                // Kalau maxHp belum ada, anggap HP sekarang adalah max (sementara)
                 const maxHP = t.stats?.maxHp !== undefined ? t.stats.maxHp : currentHP;
+                const ac = t.stats?.ac || '?';
+                
+                // [LOGIC RAHASIA] Kalau Player, jangan kasih liat angka Monster!
+                let statsDisplay = '';
+                
+                if (t.type === 'player') {
+                    // Player liat Player lain -> OK
+                    statsDisplay = `
+                        <div style="font-size:11px; color:#aaa; display:flex; align-items:center;">
+                            <span style="color:${currentHP < maxHP / 2 ? '#e74c3c' : '#2ecc71'}">
+                                HP: ${currentHP} / ${maxHP}
+                            </span>
+                            ${isHost ? `<div class="hp-controls">
+                                <button class="btn-mini-hp btn-heal" onclick="promptHP('${t.id}', 'heal')">+</button>
+                                <button class="btn-mini-hp btn-dmg" onclick="promptHP('${t.id}', 'dmg')">−</button>
+                            </div>` : ''}
+                            <span style="margin-left:8px; border-left:1px solid #444; padding-left:8px;">AC: ${ac}</span>
+                        </div>`;
+                } else {
+                    // Ini Monster/NPC
+                    if (isHost) {
+                        // DM Liat Lengkap
+                        statsDisplay = `
+                        <div style="font-size:11px; color:#aaa; display:flex; align-items:center;">
+                            <span style="color:${currentHP < maxHP / 2 ? '#e74c3c' : '#2ecc71'}">
+                                HP: ${currentHP} / ${maxHP}
+                            </span>
+                            <div class="hp-controls">
+                                <button class="btn-mini-hp btn-heal" onclick="promptHP('${t.id}', 'heal')">+</button>
+                                <button class="btn-mini-hp btn-dmg" onclick="promptHP('${t.id}', 'dmg')">−</button>
+                            </div>
+                            <span style="margin-left:8px; border-left:1px solid #444; padding-left:8px;">AC: ${ac}</span>
+                        </div>`;
+                    } else {
+                        // Player Liat Monster -> KOSONG / Deskripsi Status Aja
+                        // Class 'battle-enemy-stats' udah kita hide via CSS di langkah 1, tapi ini double protection
+                        statsDisplay = `<div class="battle-enemy-stats" style="font-size:10px; color:#666; font-style:italic;">Enemy</div>`;
+                    }
+                }
 
                 // --- LOGIC INPUT INITIATIVE ---
                 let initDisplay = '';
                 if (t.type === 'player') {
                     const val = (t.initiativeTotal !== undefined && t.initiativeTotal !== '-') ? t.initiativeTotal : '';
+                    // Player cuma bisa edit input PUNYA SENDIRI (Logic tambahan kalo mau strict, tapi skrg open aja biar cepet)
+                    const disabled = (!isHost && !state.savedPlayers.find(p => p.name === t.name)) ? '' : ''; 
+                    
                     initDisplay = `<input type="number" class="init-input" value="${val}" placeholder="0" 
                                     onchange="updateInitiativeManual('${t.id}', this.value)" 
-                                    onclick="event.stopPropagation()">`; 
+                                    onclick="event.stopPropagation()" ${disabled}>`; 
                 } else {
                     const val = (t.initiativeTotal !== undefined) ? t.initiativeTotal : '-';
                     const color = val === '-' ? '#f1c40f' : '#fff';
@@ -3300,25 +3434,10 @@
                 return `
                 <div class="battle-item" style="${activeStyle}">
                     <div class="battle-item-icon">${icon}</div>
-                    
                     <div style="flex:1;">
                         <div class="battle-item-name">${t.name}</div>
-                        <div style="font-size:11px; color:#aaa; display:flex; align-items:center;">
-                            <span style="color:${currentHP < maxHP / 2 ? '#e74c3c' : '#2ecc71'}">
-                                HP: ${currentHP} / ${maxHP}
-                            </span>
-                            
-                            <div class="hp-controls">
-                                <button class="btn-mini-hp btn-heal" onclick="promptHP('${t.id}', 'heal')" title="Heal">+</button>
-                                <button class="btn-mini-hp btn-dmg" onclick="promptHP('${t.id}', 'dmg')" title="Damage">−</button>
-                            </div>
-                            
-                            <span style="margin-left:8px; border-left:1px solid #444; padding-left:8px;">
-                                AC: ${t.stats?.ac || '?'}
-                            </span>
-                        </div>
+                        ${statsDisplay}
                     </div>
-
                     <div style="font-weight:bold; min-width:50px; text-align:right;">
                         ${initDisplay}
                     </div>
@@ -3632,7 +3751,22 @@
                         // Update Battle Tracker
                         state.combatants = data.combatants || [];
                         state.currentTurnIndex = data.turnIndex || -1;
+
                         if(battleTracker.style.display !== 'none') renderBattleListUI();
+                        if (data.battleOpen !== undefined) {
+                            const tracker = document.getElementById('battleTracker');
+                            if (data.battleOpen) {
+                                // Kalau DM buka -> Player ikut buka
+                                tracker.style.display = ''; 
+                                void tracker.offsetWidth;
+                                tracker.classList.add('active');
+                                // Render ulang biar logic hide stats jalan
+                                renderBattleListUI(); 
+                            } else {
+                                // Kalau DM tutup -> Player ikut tutup
+                                tracker.classList.remove('active');
+                            }
+                        }
 
                         renderImage();
                     }
@@ -3672,13 +3806,17 @@
         function broadcastUpdate() {
             if (!isHost || !state.currentImage) return;
 
+            // Cek apakah battle tracker lagi kebuka?
+            const isBattleOpen = document.getElementById('battleTracker').classList.contains('active');
+
             const updatePackage = {
                 type: 'SYNC_UPDATE',
-                tokens: state.currentImage.tokens, // Kirim posisi terbaru
+                tokens: state.currentImage.tokens, 
                 gridSize: state.gridSize,
                 showGrid: state.showGrid,
-                combatants: state.combatants, // Kirim data Battle Tracker juga
-                turnIndex: state.currentTurnIndex
+                combatants: state.combatants, 
+                turnIndex: state.currentTurnIndex,
+                battleOpen: isBattleOpen // <--- INFO PENTING BARU
             };
 
             connectedPlayers.forEach(conn => {
