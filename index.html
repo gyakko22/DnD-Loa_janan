@@ -1016,22 +1016,21 @@
             overflow: visible;  /* Biar popup bisa keluar dari kotak */
         }
 
+        /* UPDATE CSS INI DI DALAM <STYLE> */
         .roll-box {
-            position: absolute;
-            right: 102%; /* Muncul di SEBELAH KIRI item */
-            top: 50%;
-            transform: translateY(-50%);
+            position: fixed; /* Ganti jadi Fixed biar nempel di layar */
+            /* Hapus right: 102% dan top: 50% yang lama karena sekarang diatur JS */
             
             display: flex;
             align-items: center;
             gap: 8px;
             padding: 6px 12px;
-            min-width: 100px;
+            min-width: 80px;
             justify-content: center;
 
-            background: #1a1a1a; /* Warna Gelap Elegan */
-            border: 1px solid var(--color-primary); /* Border Coklat D&D */
-            border-left: 4px solid #e74c3c; /* Aksen Merah */
+            background: #1a1a1a;
+            border: 1px solid var(--color-primary);
+            border-left: 4px solid #e74c3c;
             border-radius: 4px;
             box-shadow: 4px 4px 10px rgba(0,0,0,0.5);
             
@@ -1039,24 +1038,18 @@
             font-family: 'Courier New', monospace;
             font-weight: bold;
             font-size: 14px;
-            z-index: 999;
+            z-index: 9999; /* Z-Index tinggi biar di atas segalanya */
 
-            /* Animasi Fading */
             opacity: 0;
-            transition: opacity 0.3s ease, transform 0.3s ease;
+            transition: opacity 0.3s ease;
             pointer-events: none;
         }
 
-        .roll-box.active {
-            opacity: 1;
-            transform: translateY(-50%) translateX(0);
-        }
-
+        .roll-box.active { opacity: 1; } /* Transform diatur JS */
         .roll-box.finished {
-            border-color: #2ecc71; /* Jadi Hijau pas selesai */
+            border-color: #2ecc71;
             border-left-color: #2ecc71;
             background: #0f2b15;
-            transform: translateY(-50%) scale(1.1); /* Sedikit membesar */
         }
 
         /* Modifer angka kecil abu-abu */
@@ -1245,7 +1238,9 @@
                     </div>
                 
                 <div class="panel-footer">
-                    <button class="btn btn-secondary btn-sm" onclick="rollAllInitiative()">🎲 Roll All</button>
+                    <button class="btn btn-reset btn-sm" onclick="finishBattle()" title="Reset Initiatives">🏁 End</button>
+                    
+                    <div style="flex:1"></div> <button class="btn btn-secondary btn-sm" onclick="rollAllInitiative()">🎲 Roll All</button>
                     <button class="btn btn-primary btn-sm" onclick="nextTurn()">Next ▶</button>
                 </div>
             </div>
@@ -3217,28 +3212,25 @@
         // Dummy Functions (Nanti kita isi logicnya)
         // --- CINEMATIC ROLL INITIATIVE ---
         // --- CINEMATIC ROLL (SLOW DOWN EFFECT) ---
+        // --- CINEMATIC ROLL (BODY ATTACHMENT FIX) ---
         function rollAllInitiative() {
             if (!state.currentImage || state.currentImage.tokens.length === 0) return;
 
             const enemies = state.combatants.filter(t => t.type !== 'player');
             if (enemies.length === 0) return;
 
-            // Kunci tombol biar gak dipencet 2x
             const btn = document.querySelector('#battleTracker .panel-footer button');
             if(btn) btn.disabled = true;
 
-            // Variabel pelacak
             let activeAnimations = 0;
 
             enemies.forEach(token => {
-                // Skip yang sudah punya init (kecuali mau force reroll)
                 if (token.initiativeTotal !== undefined && token.initiativeTotal !== '-') return;
 
-                // Cari elemen DOM
+                // Cari elemen DOM di list
                 const domItems = document.querySelectorAll('.battle-item');
                 let targetItem = null;
                 domItems.forEach(el => {
-                    // Cari berdasarkan nama (Pastikan nama unik atau logicnya kuat)
                     if(el.querySelector('.battle-item-name').textContent === token.name) {
                         targetItem = el;
                     }
@@ -3249,76 +3241,71 @@
                     const mod = parseInt(token.stats?.init || 0);
                     const modStr = mod >= 0 ? `+${mod}` : mod;
                     
-                    // 1. BIKIN KOTAK POPUP
+                    // 1. HITUNG POSISI ABSOLUT
+                    const rect = targetItem.getBoundingClientRect();
+                    
+                    // 2. BIKIN KOTAK DI BODY (Biar gak kepotong scroll)
                     const box = document.createElement('div');
                     box.className = 'roll-box';
-                    targetItem.appendChild(box);
+                    document.body.appendChild(box);
                     
-                    // Trigger animasi masuk (kasih delay dikit biar transisi jalan)
+                    // Set Posisi Awal (Di sebelah kiri item battle)
+                    // Kita geser -120px ke kiri dari tepi kiri item
+                    box.style.top = (rect.top + (rect.height / 2)) + 'px';
+                    box.style.left = (rect.left - 10) + 'px'; 
+                    box.style.transform = 'translate(-100%, -50%)'; // Geser ke kiri titik anchor
+                    
+                    // Animasi Masuk
                     requestAnimationFrame(() => box.classList.add('active'));
 
-                    // 2. LOGIC ANIMASI MELAMBAT
-                    let speed = 50; // Mulai cepat (50ms)
+                    // 3. LOGIC ANIMASI MELAMBAT
+                    let speed = 50;
                     let step = 0;
-                    const maxSteps = 15; // Berapa kali ganti angka sebelum stop
+                    const maxSteps = 15;
                     
                     const animateStep = () => {
-                        // Angka Acak Sementara
                         const randomFace = Math.floor(Math.random() * 20) + 1;
-                        
-                        // Render: "🎲 14 +2"
                         box.innerHTML = `🎲 ${randomFace} <span class="roll-mod">${modStr}</span>`;
 
                         if (step < maxSteps) {
                             step++;
-                            speed += 15; // MAKIN LAMA MAKIN PELAN (+15ms setiap step)
+                            speed += 15;
                             setTimeout(animateStep, speed);
                         } else {
-                            // --- STOP & FINAL RESULT ---
+                            // FINISH
                             const finalRoll = Math.floor(Math.random() * 20) + 1;
                             const total = finalRoll + mod;
-                            
-                            // Simpan ke data token
                             token.initiativeTotal = total;
 
-                            // Update Tampilan Kotak (Hasil Akhir)
                             box.classList.add('finished');
-                            box.innerHTML = `🏁 ${total}`; // Tampilkan Total
+                            box.innerHTML = `🏁 ${total}`;
                             
-                            // Tunggu sebentar biar user liat hasilnya, baru ilang
                             setTimeout(() => {
-                                box.classList.remove('active'); // Fade out
+                                box.style.opacity = '0';
                                 setTimeout(() => {
-                                    box.remove(); // Hapus dari DOM
-                                    
+                                    box.remove();
                                     activeAnimations--;
-                                    // Kalau semua monster udah selesai -> FINAL UPDATE
-                                    if (activeAnimations <= 0) {
-                                        finishRolling();
-                                    }
+                                    if (activeAnimations <= 0) finishRolling();
                                 }, 300);
-                            }, 1500); // Tahan hasil selama 1.5 detik
+                            }, 1500);
                         }
                     };
-
-                    // Mulai loop
                     animateStep();
                 } 
                 else {
-                    // Fallback kalau DOM gak ketemu (langsung hitung aja)
+                    // Fallback
                     const roll = Math.floor(Math.random() * 20) + 1;
                     token.initiativeTotal = roll + parseInt(token.stats?.init || 0);
                 }
             });
 
-            // Kalau gak ada animasi yang jalan (misal DOM error), langsung finish
             if (activeAnimations === 0) finishRolling();
 
             function finishRolling() {
                 sortCombatants();
                 renderBattleListUI();
                 if(btn) btn.disabled = false;
-                if(isHost) broadcastUpdate(); // Kirim ke Player
+                if(isHost) broadcastUpdate();
             }
         }
 
@@ -3496,6 +3483,26 @@
                 </div>
                 `;
             }).join('');
+        }
+
+        function finishBattle() {
+            if (!confirm("Akhiri combat dan reset semua initiative?")) return;
+
+            // 1. Reset Semua Initiative
+            state.combatants.forEach(t => {
+                t.initiativeTotal = undefined; // Hapus nilai
+            });
+
+            // 2. Reset Turn
+            state.currentTurnIndex = -1;
+
+            // 3. Update UI
+            renderBattleListUI();
+            
+            // 4. Lapor Player
+            if(isHost) broadcastUpdate();
+            
+            showToast("Battle Finished! Initiative Reset.", "🏁");
         }
 
         function focusOnToken(tokenId) {
@@ -3802,9 +3809,21 @@
 
                         // Update Battle Tracker
                         state.combatants = data.combatants || [];
+                        const oldTurn = state.currentTurnIndex;
                         state.currentTurnIndex = data.turnIndex || -1;
 
-                        if(battleTracker.style.display !== 'none') renderBattleListUI();
+                        if(battleTracker.style.display !== 'none') {
+                            renderBattleListUI();
+                            
+                            // Kalau Turn Berubah -> Fokus Kamera ke Orang Baru!
+                            if (state.currentTurnIndex !== -1 && state.currentTurnIndex !== oldTurn) {
+                                const activeToken = state.combatants[state.currentTurnIndex];
+                                if (activeToken) {
+                                    // Kasih delay dikit biar render kelar dulu
+                                    setTimeout(() => focusOnToken(activeToken.id), 200);
+                                }
+                            }
+                        }
                         if (data.battleOpen !== undefined) {
                             const tracker = document.getElementById('battleTracker');
                             if (data.battleOpen) {
