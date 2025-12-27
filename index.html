@@ -2020,34 +2020,30 @@
                     <div class="section-content" id="pinSection">
                 `;
                 
-                listHtml += state.currentImage.tokens.map((token) => {
-                    const icon = getIconHTML(token.type, token.cls);
-                    
-                    // Ambil info AC/HP buat preview
-                    const ac = token.stats ? token.stats.ac : (token.ac || '-');
-
+                // [FIX] LOOPING PINS, BUKAN TOKENS!
+                listHtml += state.currentImage.pins.map((pin) => {
                     return `
                     <div class="pin-item">
                         <div class="pin-item-info" style="display:flex; align-items:center;">
-                            <div class="list-icon-wrapper">
-                                ${icon}
+                            <div class="list-icon-wrapper" style="background:var(--color-primary); border:none;">
+                                <div style="width:8px; height:8px; background:#1a1a1a; border-radius:50%;"></div>
                             </div>
                             
                             <div>
-                                <div style="font-weight:bold;">${token.name}</div>
+                                <div style="font-weight:bold;">${pin.name || 'Unnamed Pin'}</div>
                                 <div style="font-size:10px; color:#888;">
-                                    Size: ${token.size||'Med'} | AC: ${ac}
+                                    Link: ${pin.linkedImage ? '✅ Connected' : '❌ No Map'}
                                 </div>
                             </div>
                         </div>
                         <div class="pin-item-actions">
-                            <button onclick="openEditTokenMode('${token.id}')">✏️</button>
-                            <button class="delete-btn" onclick="openDeleteModal('${token.id}', 'token')">🗑️</button>
+                            <button onclick="editItemName('${pin.id}', 'pin')">✏️</button>
+                            <button class="delete-btn" onclick="openDeleteModal('${pin.id}', 'pin')">🗑️</button>
                         </div>
                     </div>
                 `}).join('');
                 
-                listHtml += `</div>`; // Tutup div section
+                listHtml += `</div>`; 
             }
 
             // 2. RENDER CHARACTERS LIST
@@ -2504,6 +2500,7 @@
                                     setInteractionMode('pin'); 
                                 }, 100);
                                 showToast('✅ Project loaded!');
+                                if (isHost) broadcastMap();
                             } else {
                                 showToast('❌ No valid data found');
                             }
@@ -2597,6 +2594,7 @@
         }
 
         function openDeleteModal(id, type) {
+            closeCharacterPopup();
             state.itemToDelete = { id: parseFloat(id), type };
             deleteConfirmModal.classList.add('active');
         }
@@ -2828,6 +2826,7 @@
         }
 
         function openEditTokenMode(tokenId) {
+            closeCharacterPopup();
             // 1. Cari Tokennya
             const t = findTokenById(state.currentImage, parseFloat(tokenId));
             if (!t) return;
