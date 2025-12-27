@@ -3347,12 +3347,12 @@
                 // Simpan nilai
                 token.initiativeTotal = parseInt(value) || 0;
                 
-                // [FIX PENTING] Lapor ke semua orang kalau angka berubah!
+                // [FIX BUG 1] Langsung Sortir & Render ulang biar urutan visual update!
+                sortCombatants(); 
+                renderBattleListUI();
+
+                // Lapor ke player (kirim list yang SUDAH rapi)
                 if (isHost) broadcastUpdate();
-                
-                // Opsional: Kalau mau langsung sort (hati-hati listnya loncat pas ngetik)
-                // sortCombatants(); 
-                // renderBattleListUI();
             }
         }
 
@@ -3843,7 +3843,7 @@
                         // Update Battle Tracker
                         state.combatants = data.combatants || [];
                         const oldTurn = state.currentTurnIndex;
-                        state.currentTurnIndex = data.turnIndex || -1;
+                        state.currentTurnIndex = (data.turnIndex !== undefined) ? data.turnIndex : -1;
 
                         if(battleTracker.style.display !== 'none') {
                             renderBattleListUI();
