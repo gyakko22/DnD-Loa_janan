@@ -984,7 +984,6 @@
         body.player-mode #loadBtn { display: none !important; } /* Load Hilang */
         body.player-mode #openBuilderBtn { display: none !important; } /* Builder Hilang */
         body.player-mode #resetBtn { display: none !important; } /* Reset Hilang */
-        body.player-mode .token-hp-bar { opacity: 0; } /* Opsional: Player gak liat HP bar musuh */
         body.player-mode #battleBtn { display: none !important; } /* Battle Tracker tombolnya ilang */
 
         /* Battle Tracker Player cuma bisa liat list, gak bisa next turn/roll */
@@ -1933,14 +1932,32 @@
             return state.currentImage.tokens.map(token => {
                 const isSelected = state.selectedTokens.includes(token.id) ? 'selected' : '';
                 
-                // Konversi Scale Legacy (biar save lama gak rusak)
                 let currentScale = token.scale || 1;
-                if (!token.scale && token.size) {
-                    currentScale = token.size / 35;
-                }
+                if (!token.scale && token.size) currentScale = token.size / 35;
 
-                // --- LOGIC BARU PAKAI HELPER ---
                 const iconContent = getIconHTML(token.type, token.cls);
+
+                // [FIX BUG 5] Hitung HP Bar saat Rendering Ulang
+                let barHtml = '';
+                if (token.type === 'player') {
+                    // Ambil HP & MaxHP (Fallback ke HP sekarang kalau Max belum ada)
+                    const hp = token.stats?.hp !== undefined ? parseInt(token.stats.hp) : 10;
+                    const max = token.stats?.maxHp !== undefined ? parseInt(token.stats.maxHp) : hp;
+                    
+                    // Hitung Persen
+                    const pct = max > 0 ? Math.max(0, Math.min(100, (hp / max) * 100)) : 100;
+                    
+                    // Tentukan Warna (Hijau -> Kuning -> Merah)
+                    let barColor = 'linear-gradient(to right, #2ecc71, #27ae60)';
+                    if (pct <= 50) barColor = 'linear-gradient(to right, #f1c40f, #f39c12)';
+                    if (pct <= 20) barColor = 'linear-gradient(to right, #e74c3c, #c0392b)';
+
+                    // Render HTML Bar dengan lebar yang benar
+                    barHtml = `
+                    <div class="token-hp-bar">
+                        <div class="token-hp-fill" style="width: ${pct}%; background: ${barColor};"></div>
+                    </div>`;
+                }
 
                 return `
                 <div class="token token-${token.type} ${isSelected}" 
@@ -1951,13 +1968,7 @@
                     <div class="token-icon">
                         ${iconContent}
                     </div>
-
-                    ${ (token.type === 'player') ? `
-                    <div class="token-hp-bar">
-                        <div class="token-hp-fill" style="width: 100%;"></div>
-                    </div>
-                    ` : '' }
-
+                    ${barHtml}
                 </div>
             `}).join('');
         }
@@ -3032,7 +3043,7 @@
                     }).join('')}
                 </div>
 
-                <div class="char-actions">
+                <div class="char-actions" style="${!isHost ? 'display:none' : ''}">
                     <button class="mini-btn" onclick="openEditTokenMode('${t.id}')">✏️ Edit</button>
                     <button class="mini-btn" onclick="openDeleteModal('${t.id}', 'token')">🗑️ Delete</button>
                 </div>
@@ -3303,31 +3314,58 @@
         // --- LOGIC HEAL & DAMAGE ---
 
         function adjustTokenHP(id, amount) {
+            // Validasi Host (Biar aman)
+            if (!isHost) {
+                showToast("Eits, cuma DM yang boleh atur nyawa!", "🚫");
+                return;
+            }
+
             const token = findTokenById(state.currentImage, parseFloat(id));
             if (!token || !token.stats) return;
 
-            // 1. Inisialisasi Max HP kalau belum ada
-            // (Asumsi saat pertama kali spawn, HP stat adalah Max HP)
+            // Init Max HP
             if (token.stats.maxHp === undefined) {
                 token.stats.maxHp = parseInt(token.stats.hp) || 10;
             }
 
-            // 2. Hitung HP Baru
+            // Hitung HP
             let current = parseInt(token.stats.hp) || 0;
             const max = token.stats.maxHp;
-
             let newHp = current + amount;
-
-            // Logic Cap: Gak boleh < 0, Gak boleh > Max HP
             if (newHp < 0) newHp = 0;
             if (newHp > max) newHp = max;
 
-            // 3. Simpan
+            // Simpan
             token.stats.hp = newHp;
 
-            // 4. Update Visual (List & Map)
-            renderBattleListUI(); // Update angka di jendela battle
-            updateMapTokenHP(token); // Update bar hijau di map
+            // Update UI Lokal
+            renderBattleListUI(); // List Battle
+            updateMapTokenHP(token); // Bar di Map
+            
+            // [FIX BUG 2] Update Bar di Popup Card kalau lagi kebuka
+            if (state.activePopupTokenId === token.id) {
+                updatePopupCardHP(token); 
+            }
+
+            // [FIX BUG 1] Kirim info terbaru ke Player!
+            broadcastUpdate(); 
+        }
+
+        // [HELPER BARU] Update UI Card tanpa render ulang seluruh HTML
+        function updatePopupCardHP(token) {
+            const popup = document.getElementById('characterPopup');
+            if (!popup) return;
+            
+            const hpVal = popup.querySelector('.vital-val.hp');
+            const hpBar = popup.querySelector('.vital-hp-fill');
+            
+            if (hpVal && hpBar) {
+                const max = token.stats.maxHp || 10;
+                const pct = (token.stats.hp / max) * 100;
+                
+                hpVal.textContent = token.stats.hp; // Update Angka
+                hpBar.style.width = `${pct}%`;      // Update Bar Merah
+            }
         }
 
         function promptHP(id, type) {
