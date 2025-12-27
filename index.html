@@ -1631,6 +1631,8 @@
                 document.documentElement.style.setProperty('--grid-size', val + 'px');
                 
                 updateGrid();
+
+                if (isHost) broadcastUpdate()
             });
 
             imageContainer.addEventListener('click', handleImageClick);
