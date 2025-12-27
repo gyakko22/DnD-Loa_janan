@@ -3208,11 +3208,70 @@
             renderBattleListUI();
         }
     
+        function playRollAnimation(tokenName, mod, finalTotal, onComplete) {
+            // Cari elemen DOM di list battle berdasarkan Nama
+            // (Kita cari manual karena ID di list mungkin beda urutan render)
+            const domItems = document.querySelectorAll('.battle-item');
+            let targetItem = null;
+            
+            domItems.forEach(el => {
+                const nameEl = el.querySelector('.battle-item-name');
+                if(nameEl && nameEl.textContent === tokenName) {
+                    targetItem = el;
+                }
+            });
 
-        // Dummy Functions (Nanti kita isi logicnya)
-        // --- CINEMATIC ROLL INITIATIVE ---
-        // --- CINEMATIC ROLL (SLOW DOWN EFFECT) ---
-        // --- CINEMATIC ROLL (BODY ATTACHMENT FIX) ---
+            if (!targetItem) {
+                if(onComplete) onComplete(); 
+                return;
+            }
+
+            const modStr = mod >= 0 ? `+${mod}` : mod;
+
+            // 1. HITUNG POSISI
+            const rect = targetItem.getBoundingClientRect();
+            
+            // 2. BIKIN KOTAK DI BODY
+            const box = document.createElement('div');
+            box.className = 'roll-box';
+            document.body.appendChild(box);
+            
+            // Set Posisi
+            box.style.top = (rect.top + (rect.height / 2)) + 'px';
+            box.style.left = (rect.left - 10) + 'px'; 
+            box.style.transform = 'translate(-100%, -50%)'; 
+            
+            requestAnimationFrame(() => box.classList.add('active'));
+
+            // 3. ANIMASI BERPUTAR
+            let speed = 50;
+            let step = 0;
+            const maxSteps = 15;
+            
+            const animateStep = () => {
+                const randomFace = Math.floor(Math.random() * 20) + 1;
+                box.innerHTML = `🎲 ${randomFace} <span class="roll-mod">${modStr}</span>`;
+
+                if (step < maxSteps) {
+                    step++;
+                    speed += 15;
+                    setTimeout(animateStep, speed);
+                } else {
+                    // STOP di Angka Final yang dikirim DM
+                    box.classList.add('finished');
+                    box.innerHTML = `🏁 ${finalTotal}`;
+                    
+                    if (onComplete) onComplete(); // Kabari kalau udah kelar
+
+                    setTimeout(() => {
+                        box.style.opacity = '0';
+                        setTimeout(() => box.remove(), 300);
+                    }, 1500);
+                }
+            };
+            animateStep();
+        }
+        
         function rollAllInitiative() {
             if (!state.currentImage || state.currentImage.tokens.length === 0) return;
 
@@ -3222,90 +3281,63 @@
             const btn = document.querySelector('#battleTracker .panel-footer button');
             if(btn) btn.disabled = true;
 
-            let activeAnimations = 0;
+            // 1. HITUNG DULU SEMUA HASILNYA (PRE-CALCULATE)
+            const rollData = [];
 
             enemies.forEach(token => {
                 if (token.initiativeTotal !== undefined && token.initiativeTotal !== '-') return;
 
-                // Cari elemen DOM di list
-                const domItems = document.querySelectorAll('.battle-item');
-                let targetItem = null;
-                domItems.forEach(el => {
-                    if(el.querySelector('.battle-item-name').textContent === token.name) {
-                        targetItem = el;
-                    }
+                const mod = parseInt(token.stats?.init || 0);
+                const roll = Math.floor(Math.random() * 20) + 1;
+                const total = roll + mod;
+
+                // Simpan ke data token
+                token.initiativeTotal = total;
+
+                // Masukkan ke paket kiriman
+                rollData.push({
+                    name: token.name, // Kita pakai nama sebagai ID sementara
+                    mod: mod,
+                    total: total
                 });
-
-                if (targetItem) {
-                    activeAnimations++;
-                    const mod = parseInt(token.stats?.init || 0);
-                    const modStr = mod >= 0 ? `+${mod}` : mod;
-                    
-                    // 1. HITUNG POSISI ABSOLUT
-                    const rect = targetItem.getBoundingClientRect();
-                    
-                    // 2. BIKIN KOTAK DI BODY (Biar gak kepotong scroll)
-                    const box = document.createElement('div');
-                    box.className = 'roll-box';
-                    document.body.appendChild(box);
-                    
-                    // Set Posisi Awal (Di sebelah kiri item battle)
-                    // Kita geser -120px ke kiri dari tepi kiri item
-                    box.style.top = (rect.top + (rect.height / 2)) + 'px';
-                    box.style.left = (rect.left - 10) + 'px'; 
-                    box.style.transform = 'translate(-100%, -50%)'; // Geser ke kiri titik anchor
-                    
-                    // Animasi Masuk
-                    requestAnimationFrame(() => box.classList.add('active'));
-
-                    // 3. LOGIC ANIMASI MELAMBAT
-                    let speed = 50;
-                    let step = 0;
-                    const maxSteps = 15;
-                    
-                    const animateStep = () => {
-                        const randomFace = Math.floor(Math.random() * 20) + 1;
-                        box.innerHTML = `🎲 ${randomFace} <span class="roll-mod">${modStr}</span>`;
-
-                        if (step < maxSteps) {
-                            step++;
-                            speed += 15;
-                            setTimeout(animateStep, speed);
-                        } else {
-                            // FINISH
-                            const finalRoll = Math.floor(Math.random() * 20) + 1;
-                            const total = finalRoll + mod;
-                            token.initiativeTotal = total;
-
-                            box.classList.add('finished');
-                            box.innerHTML = `🏁 ${total}`;
-                            
-                            setTimeout(() => {
-                                box.style.opacity = '0';
-                                setTimeout(() => {
-                                    box.remove();
-                                    activeAnimations--;
-                                    if (activeAnimations <= 0) finishRolling();
-                                }, 300);
-                            }, 1500);
-                        }
-                    };
-                    animateStep();
-                } 
-                else {
-                    // Fallback
-                    const roll = Math.floor(Math.random() * 20) + 1;
-                    token.initiativeTotal = roll + parseInt(token.stats?.init || 0);
-                }
             });
 
-            if (activeAnimations === 0) finishRolling();
+            if (rollData.length === 0) {
+                 if(btn) btn.disabled = false;
+                 return;
+            }
+
+            // 2. KIRIM SINYAL ANIMASI KE PLAYER
+            if (isHost) {
+                // Kirim paket khusus tipe 'SYNC_ROLL_FX'
+                const fxPackage = {
+                    type: 'SYNC_ROLL_FX',
+                    rolls: rollData
+                };
+                
+                // Broadcast manual karena fungsi broadcastUpdate() isinya beda
+                connectedPlayers.forEach(conn => {
+                    if (conn.open) conn.send(fxPackage);
+                });
+            }
+
+            // 3. JALANKAN ANIMASI DI LAYAR DM SENDIRI
+            let completed = 0;
+            rollData.forEach(data => {
+                playRollAnimation(data.name, data.mod, data.total, () => {
+                    completed++;
+                    if (completed >= rollData.length) {
+                        // Kalau semua animasi kelar, baru update list
+                        finishRolling();
+                    }
+                });
+            });
 
             function finishRolling() {
                 sortCombatants();
                 renderBattleListUI();
                 if(btn) btn.disabled = false;
-                if(isHost) broadcastUpdate();
+                if(isHost) broadcastUpdate(); // Update posisi list akhir ke player
             }
         }
 
@@ -3351,6 +3383,7 @@
             if (activeToken) {
                 focusOnToken(activeToken.id);
             }
+            if (isHost) broadcastUpdate();
         }
 
 
@@ -3841,6 +3874,13 @@
 
                         renderImage();
                     }
+                }
+
+                if (data.type === 'SYNC_ROLL_FX') {
+                    // Loop semua data roll dan mainkan animasinya
+                    data.rolls.forEach(roll => {
+                        playRollAnimation(roll.name, roll.mod, roll.total);
+                    });
                 }
             });
         }
