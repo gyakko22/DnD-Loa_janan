@@ -1011,20 +1011,56 @@
         .toast.show { opacity: 1; transform: translateY(0); }
         .toast-icon { font-size: 18px; }
 
-        .rolling-overlay {
-            position: absolute;
-            right: 10px; top: 50%; transform: translateY(-50%);
-            background: linear-gradient(135deg, #e74c3c, #c0392b);
-            color: white; padding: 4px 12px;
-            border-radius: 4px; border: 2px solid #fff;
-            font-weight: bold; font-family: 'Courier New', monospace;
-            box-shadow: 0 0 10px rgba(231, 76, 60, 0.8);
-            z-index: 10;
-            display: flex; align-items: center; gap: 5px;
-            
-            /* Animasi Muncul */
-            animation: popIn 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        .battle-item {
+            position: relative; /* Wajib biar popupnya nempel di item ini */
+            overflow: visible;  /* Biar popup bisa keluar dari kotak */
         }
+
+        .roll-box {
+            position: absolute;
+            right: 102%; /* Muncul di SEBELAH KIRI item */
+            top: 50%;
+            transform: translateY(-50%);
+            
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 6px 12px;
+            min-width: 100px;
+            justify-content: center;
+
+            background: #1a1a1a; /* Warna Gelap Elegan */
+            border: 1px solid var(--color-primary); /* Border Coklat D&D */
+            border-left: 4px solid #e74c3c; /* Aksen Merah */
+            border-radius: 4px;
+            box-shadow: 4px 4px 10px rgba(0,0,0,0.5);
+            
+            color: white;
+            font-family: 'Courier New', monospace;
+            font-weight: bold;
+            font-size: 14px;
+            z-index: 999;
+
+            /* Animasi Fading */
+            opacity: 0;
+            transition: opacity 0.3s ease, transform 0.3s ease;
+            pointer-events: none;
+        }
+
+        .roll-box.active {
+            opacity: 1;
+            transform: translateY(-50%) translateX(0);
+        }
+
+        .roll-box.finished {
+            border-color: #2ecc71; /* Jadi Hijau pas selesai */
+            border-left-color: #2ecc71;
+            background: #0f2b15;
+            transform: translateY(-50%) scale(1.1); /* Sedikit membesar */
+        }
+
+        /* Modifer angka kecil abu-abu */
+        .roll-mod { color: #888; font-size: 11px; margin-left: 4px; }
 
         @keyframes popIn {
             from { transform: translateY(-50%) scale(0); opacity: 0; }
@@ -3180,108 +3216,124 @@
 
         // Dummy Functions (Nanti kita isi logicnya)
         // --- CINEMATIC ROLL INITIATIVE ---
+        // --- CINEMATIC ROLL (SLOW DOWN EFFECT) ---
         function rollAllInitiative() {
             if (!state.currentImage || state.currentImage.tokens.length === 0) return;
 
             const enemies = state.combatants.filter(t => t.type !== 'player');
             if (enemies.length === 0) return;
 
-            // Kunci tombol biar gak dipencet 2x pas lagi animasi
+            // Kunci tombol biar gak dipencet 2x
             const btn = document.querySelector('#battleTracker .panel-footer button');
             if(btn) btn.disabled = true;
 
-            // 1. ANIMASI ROLL
-            let completed = 0;
-            
+            // Variabel pelacak
+            let activeAnimations = 0;
+
             enemies.forEach(token => {
-                // Cuma roll yang belum punya nilai (atau paksa roll semua kalau mau)
+                // Skip yang sudah punya init (kecuali mau force reroll)
                 if (token.initiativeTotal !== undefined && token.initiativeTotal !== '-') return;
 
-                // Cari elemen HTML-nya di list
-                // Kita cari berdasarkan nama karena ID di list mungkin beda struktur DOM-nya
-                // (Cara paling aman: Render ulang list dengan ID khusus dulu, tapi ini shortcut)
+                // Cari elemen DOM
                 const domItems = document.querySelectorAll('.battle-item');
                 let targetItem = null;
-                
-                // Cari elemen DOM yang sesuai token ini
                 domItems.forEach(el => {
+                    // Cari berdasarkan nama (Pastikan nama unik atau logicnya kuat)
                     if(el.querySelector('.battle-item-name').textContent === token.name) {
                         targetItem = el;
                     }
                 });
 
                 if (targetItem) {
-                    // Inject Kotak Animasi
+                    activeAnimations++;
                     const mod = parseInt(token.stats?.init || 0);
                     const modStr = mod >= 0 ? `+${mod}` : mod;
                     
-                    const overlay = document.createElement('div');
-                    overlay.className = 'rolling-overlay';
-                    targetItem.style.position = 'relative'; // Biar overlay posisinya pas
-                    targetItem.appendChild(overlay);
+                    // 1. BIKIN KOTAK POPUP
+                    const box = document.createElement('div');
+                    box.className = 'roll-box';
+                    targetItem.appendChild(box);
+                    
+                    // Trigger animasi masuk (kasih delay dikit biar transisi jalan)
+                    requestAnimationFrame(() => box.classList.add('active'));
 
-                    // Efek Angka Acak (Slot Machine Effect)
-                    let steps = 0;
-                    const interval = setInterval(() => {
-                        const randomD20 = Math.floor(Math.random() * 20) + 1;
-                        overlay.innerHTML = `🎲 ${randomD20} <span style="font-size:10px; opacity:0.7">(${modStr})</span>`;
-                        steps++;
+                    // 2. LOGIC ANIMASI MELAMBAT
+                    let speed = 50; // Mulai cepat (50ms)
+                    let step = 0;
+                    const maxSteps = 15; // Berapa kali ganti angka sebelum stop
+                    
+                    const animateStep = () => {
+                        // Angka Acak Sementara
+                        const randomFace = Math.floor(Math.random() * 20) + 1;
                         
-                        // Berhenti setelah 20 frame (sekitar 1 detik)
-                        if (steps > 20) {
-                            clearInterval(interval);
-                            
-                            // Hitung Hasil Akhir
+                        // Render: "🎲 14 +2"
+                        box.innerHTML = `🎲 ${randomFace} <span class="roll-mod">${modStr}</span>`;
+
+                        if (step < maxSteps) {
+                            step++;
+                            speed += 15; // MAKIN LAMA MAKIN PELAN (+15ms setiap step)
+                            setTimeout(animateStep, speed);
+                        } else {
+                            // --- STOP & FINAL RESULT ---
                             const finalRoll = Math.floor(Math.random() * 20) + 1;
                             const total = finalRoll + mod;
-                            token.initiativeTotal = total; // Simpan ke data
                             
-                            // Tampilkan Hasil Akhir (Warna Emas/Hijau)
-                            overlay.style.background = '#2ecc71';
-                            overlay.style.borderColor = '#27ae60';
-                            overlay.innerHTML = `<strong>${total}</strong>`;
+                            // Simpan ke data token
+                            token.initiativeTotal = total;
+
+                            // Update Tampilan Kotak (Hasil Akhir)
+                            box.classList.add('finished');
+                            box.innerHTML = `🏁 ${total}`; // Tampilkan Total
                             
-                            // Hapus kotak setelah dilihat sebentar
+                            // Tunggu sebentar biar user liat hasilnya, baru ilang
                             setTimeout(() => {
-                                overlay.style.transition = 'opacity 0.3s, transform 0.3s';
-                                overlay.style.opacity = '0';
-                                overlay.style.transform = 'translateY(-50%) scale(2)'; // Efek "Poof"
-                                setTimeout(() => overlay.remove(), 300);
-                                
-                                completed++;
-                                // Kalau semua musuh sudah selesai roll -> SORTIR & FINAL UPDATE
-                                if (completed >= enemies.length) {
-                                    finishRolling();
-                                }
-                            }, 800);
+                                box.classList.remove('active'); // Fade out
+                                setTimeout(() => {
+                                    box.remove(); // Hapus dari DOM
+                                    
+                                    activeAnimations--;
+                                    // Kalau semua monster udah selesai -> FINAL UPDATE
+                                    if (activeAnimations <= 0) {
+                                        finishRolling();
+                                    }
+                                }, 300);
+                            }, 1500); // Tahan hasil selama 1.5 detik
                         }
-                    }, 50); // Kecepatan ganti angka (50ms)
-                } else {
-                    // Fallback kalau DOM gak ketemu (jarang terjadi)
+                    };
+
+                    // Mulai loop
+                    animateStep();
+                } 
+                else {
+                    // Fallback kalau DOM gak ketemu (langsung hitung aja)
                     const roll = Math.floor(Math.random() * 20) + 1;
                     token.initiativeTotal = roll + parseInt(token.stats?.init || 0);
-                    completed++;
                 }
             });
-            
-            // Fungsi finalisasi setelah animasi kelar
+
+            // Kalau gak ada animasi yang jalan (misal DOM error), langsung finish
+            if (activeAnimations === 0) finishRolling();
+
             function finishRolling() {
                 sortCombatants();
                 renderBattleListUI();
                 if(btn) btn.disabled = false;
-                if(isHost) broadcastUpdate(); // Kirim hasil akhir ke Player
+                if(isHost) broadcastUpdate(); // Kirim ke Player
             }
         }
 
         function updateInitiativeManual(id, value) {
             const token = state.combatants.find(t => t.id === parseFloat(id));
             if (token) {
-                // Simpan nilai mentah-mentah (User bilang "inputnya udah total")
+                // Simpan nilai
                 token.initiativeTotal = parseInt(value) || 0;
                 
-                // Langsung urutkan ulang biar dinamis!
-                sortCombatants();
-                renderBattleListUI();
+                // [FIX PENTING] Lapor ke semua orang kalau angka berubah!
+                if (isHost) broadcastUpdate();
+                
+                // Opsional: Kalau mau langsung sort (hati-hati listnya loncat pas ngetik)
+                // sortCombatants(); 
+                // renderBattleListUI();
             }
         }
 
