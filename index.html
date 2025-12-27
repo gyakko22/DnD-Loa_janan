@@ -2107,6 +2107,11 @@
             const pin = findPinById(state.currentImage, pinId);
             if (!pin) return;
 
+            if (pin.linkedImage && !isHost) {
+                showToast("Eits! Tunggu DM yang memindahkanmu.", "✋");
+                return;
+            }
+
             if (pin.linkedImage) {
                 // 1. Simpan posisi map SAAT INI dulu
                 saveCurrentViewState();
@@ -3502,10 +3507,12 @@
 
         function enterGameAsPlayer() {
             document.getElementById('lobbyScreen').style.display = 'none';
-            // AKTIFKAN PLAYER MODE (HILANGKAN TOOL DM)
             document.body.classList.add('player-mode');
             
-            // Opsional: Kasih tau user
+            // [FIX TAMBAHAN] Paksa set mode interaksi biar scroll mouse langsung jalan
+            state.mode = 'add-pin';
+            setInteractionMode('pan'); 
+            
             showToast("Kamu masuk sebagai Player. Tunggu DM mengirim Map.");
         }
 
@@ -3561,7 +3568,7 @@
 
         function setupPlayerListener(conn) {
             conn.on('data', (data) => {
-                console.log("📦 Terima Paket:", data.type);
+                // console.log("📦 Terima Paket:", data.type); // Debugging kalau perlu
 
                 // KASUS 1: TERIMA PETA BARU (Full Load)
                 if (data.type === 'SYNC_FULL_MAP') {
@@ -3569,34 +3576,46 @@
                     const node = new ImageNode(data.imageSrc);
                     node.altSrc = data.altSrc;
                     
-                    // Restore Token & Pin (PENTING: Convert stats balik kalau perlu)
                     node.tokens = data.tokens || [];
                     node.pins = data.pins || [];
 
                     state.currentImage = node;
-                    state.navigationStack = [node]; // Reset stack player
+                    state.navigationStack = [node];
                     
-                    // Restore Grid
-                    state.gridSize = data.gridSize;
+                    // [FIX ZOOM MACET] Paksa mode ke 'add-pin' biar mouse handler jalan
+                    state.mode = 'add-pin'; 
+                    
+                    // [FIX GRID MACET] Update State & CSS Variable LANGSUNG
+                    state.gridSize = data.gridSize || 35;
                     state.showGrid = data.showGrid;
                     document.documentElement.style.setProperty('--grid-size', state.gridSize + 'px');
+                    
+                    // Update checkbox UI player (biar visualnya sinkron)
+                    if(gridToggle) gridToggle.checked = state.showGrid;
+                    if(gridSizeInput) gridSizeInput.value = state.gridSize;
 
                     renderImage();
-                    showToast("DM just updated the map!");
+                    showToast("Map Received from DM!", "🗺️");
                 }
 
-                // KASUS 2: TERIMA UPDATE GERAKAN (Ringan)
+                // KASUS 2: TERIMA UPDATE (Gerakan / Grid / HP)
                 if (data.type === 'SYNC_UPDATE') {
                     if (state.currentImage) {
-                        // Update posisi token tanpa reload gambar
                         state.currentImage.tokens = data.tokens;
                         
-                        // Update Grid
-                        state.gridSize = data.gridSize;
-                        state.showGrid = data.showGrid;
-                        document.documentElement.style.setProperty('--grid-size', state.gridSize + 'px');
+                        // [FIX GRID RESIZE REALTIME]
+                        if (data.gridSize !== undefined) {
+                            state.gridSize = data.gridSize;
+                            document.documentElement.style.setProperty('--grid-size', state.gridSize + 'px');
+                            if(gridSizeInput) gridSizeInput.value = state.gridSize;
+                        }
+                        
+                        if (data.showGrid !== undefined) {
+                            state.showGrid = data.showGrid;
+                            if(gridToggle) gridToggle.checked = state.showGrid;
+                        }
 
-                        // Update Battle Tracker (Kalau lagi buka)
+                        // Update Battle Tracker
                         state.combatants = data.combatants || [];
                         state.currentTurnIndex = data.turnIndex || -1;
                         if(battleTracker.style.display !== 'none') renderBattleListUI();
