@@ -2610,13 +2610,10 @@
             if (state.itemToDelete) {
                 const { id, type } = state.itemToDelete;
 
-                // --- LOGIC BARU: HAPUS MASSAL ---
                 if (type === 'batch') {
-                    // Filter token: Ambil token yang ID-nya TIDAK ada di daftar selectedTokens
                     state.currentImage.tokens = state.currentImage.tokens.filter(t => !state.selectedTokens.includes(t.id));
-                    state.selectedTokens = []; // Reset seleksi setelah dihapus
+                    state.selectedTokens = []; 
                 } 
-                // --------------------------------
                 else if (type === 'pin') {
                     const idx = state.currentImage.pins.findIndex(p => p.id === id);
                     if (idx !== -1) state.currentImage.pins.splice(idx, 1);
@@ -2624,6 +2621,16 @@
                     const idx = state.currentImage.tokens.findIndex(t => t.id === id);
                     if (idx !== -1) state.currentImage.tokens.splice(idx, 1);
                 }
+                
+                // [FIX BUG] Sinkronisasi Battle Tracker jika sedang aktif
+                if (battleTracker.classList.contains('active')) {
+                    syncBattleData(); // Hapus token mati dari list battle
+                    renderBattleListUI(); // Render ulang list
+                }
+                
+                // Kirim update ke player lain
+                if (isHost) broadcastUpdate();
+
                 renderImage();
             }
             closeDeleteModal();
@@ -2985,26 +2992,25 @@
             popup.style.setProperty('--arrow-left', `${arrowRelX}px`);
         }
 
+        // --- UPDATE FUNGSI showCharacterPopup (FIX HP 0 & Bar) ---
         function showCharacterPopup(tokenId) {
-
-            // 1. Validasi Token
+            // ... (Validasi token & Enemy check biarkan sama) ...
             const t = findTokenById(state.currentImage, tokenId);
             if (!t) return;
-            
-            // [UPDATE] Kalau tipe musuh, JANGAN buka popup!
-            if (t.type === 'enemy') {
-                closeCharacterPopup(); // Tutup kalau ada popup lain kebuka
-                return;
-            }
-            
-            // 2. Set State Aktif (Penting buat Smart Positioning)
+            if (t.type === 'enemy') { closeCharacterPopup(); return; }
+
             state.activePopupTokenId = tokenId;
-            
-            // 3. Siapkan Data
             const s = t.stats || {};
             const icon = getIconHTML(t.type, t.cls);
-            
-            // 4. Generate HTML (Lengkap dengan HP Bar Visual)
+
+            // [FIX PENTING] Hitung HP/AC dengan aman. Jangan pakai || 10.
+            const valHP = s.hp !== undefined ? s.hp : 10;
+            const valAC = s.ac !== undefined ? s.ac : 10;
+            const maxHP = s.maxHp || valHP || 10; // Max HP buat hitung bar
+
+            // Hitung Persentase Bar Merah
+            const pct = Math.max(0, Math.min(100, (valHP / maxHP) * 100));
+
             const popupHtml = `
                 <div class="char-header">
                     <div class="char-icon-frame">${icon}</div>
@@ -3016,20 +3022,20 @@
                 </div>
 
                 <div class="char-vitals">
-                    <div class="vital-box"><span class="vital-label">AC</span><span class="vital-val ac">${s.ac || 10}</span></div>
+                    <div class="vital-box"><span class="vital-label">AC</span><span class="vital-val ac">${valAC}</span></div>
                     
                     <div class="vital-box" style="min-width: 60px;">
                         <span class="vital-label">HP</span>
-                        <span class="vital-val hp">${s.hp || 10}</span>
+                        <span class="vital-val hp">${valHP}</span>
                         <div class="vital-hp-bar">
-                            <div class="vital-hp-fill" style="width: 100%;"></div>
+                            <div class="vital-hp-fill" style="width: ${pct}%;"></div>
                         </div>
                     </div>
 
                     <div class="vital-box"><span class="vital-label">SPD</span><span class="vital-val">${s.speed || 30}</span></div>
                     <div class="vital-box"><span class="vital-label">INIT</span><span class="vital-val">${formatMod(parseInt(s.init || 0))}</span></div>
                 </div>
-
+                
                 <div class="char-stats">
                     ${['str', 'dex', 'con', 'int', 'wis', 'cha'].map(stat => {
                         const score = s[stat] || 10;
@@ -3049,12 +3055,9 @@
                 </div>
             `;
 
-            // 5. Render ke DOM
             const popup = document.getElementById('characterPopup');
             popup.innerHTML = popupHtml;
             popup.classList.add('active');
-
-            // 6. Update Posisi (Panggil fungsi Smart Positioning segera)
             updatePopupPosition();
         }
 
@@ -3072,17 +3075,14 @@
         function openBattleTracker() {
             if (!state.currentImage) return;
             
-            // 1. Pastikan display bukan none (hapus style inline peninggalan masa lalu)
             battleTracker.style.display = ''; 
-            
-            // 2. [TRIK MAGIC] Paksa browser "baca ulang" (Reflow).
-            // Tanpa baris ini, browser kadang males animasiin dari display:none.
             void battleTracker.offsetWidth; 
-            
-            // 3. Baru pasang class active buat memicu animasi CSS
             battleTracker.classList.add('active');
             
-            // Logic Refresh List
+            // [FIX BUG] Selalu sync data saat dibuka biar gak ada hantu!
+            syncBattleData();
+
+            // Kalau kosong banget, baru isi ulang dari awal
             if (state.combatants.length === 0) {
                 refreshBattleList();
             } else {
@@ -3093,6 +3093,24 @@
         function closeBattleTracker() {
             // Cabut class active -> Otomatis animasi menghilang jalan
             battleTracker.classList.remove('active');
+        }
+
+        function toggleBattleBody() {
+            const tracker = document.getElementById('battleTracker');
+            tracker.classList.toggle('minimized');
+        }
+
+        function syncBattleData() {
+            if (!state.currentImage) return;
+
+            // 1. Hapus combatant yang tokennya sudah tidak ada di map
+            state.combatants = state.combatants.filter(c => {
+                const stillExists = state.currentImage.tokens.find(t => t.id === c.id);
+                return stillExists !== undefined;
+            });
+
+            // 2. Cek apakah ada token baru yang belum masuk? (Opsional, biasanya manual roll)
+            // Tapi untuk kasus "Refresh", kita cukup pastikan yang mati dibuang.
         }
 
         // --- BATTLE TRACKER: FLOATING & DRAGGABLE ---
@@ -3360,11 +3378,15 @@
             const hpBar = popup.querySelector('.vital-hp-fill');
             
             if (hpVal && hpBar) {
+                // [FIX] Pastikan angka 0 terbaca
+                const current = token.stats.hp !== undefined ? token.stats.hp : 0;
                 const max = token.stats.maxHp || 10;
-                const pct = (token.stats.hp / max) * 100;
                 
-                hpVal.textContent = token.stats.hp; // Update Angka
-                hpBar.style.width = `${pct}%`;      // Update Bar Merah
+                // Hitung persen
+                const pct = Math.max(0, Math.min(100, (current / max) * 100));
+                
+                hpVal.textContent = current; 
+                hpBar.style.width = `${pct}%`;
             }
         }
 
