@@ -1803,6 +1803,7 @@
                         renderImage();
                     }
                 }
+                if (isHost) broadcastMap(); 
             };
             reader.readAsDataURL(file);
         }
@@ -2353,6 +2354,8 @@
                 state.draggingTokenEl = null;
                 
                 renderImage(); 
+
+                if (isHost) broadcastUpdate();
                 return;
             }
 
@@ -3412,6 +3415,12 @@
         // Ini yang nanti bakal kita isi logic kirim-kiriman Map & Token
         function setupConnection(conn) {
             connectedPlayers.push(conn);
+
+            conn.on('open', () => {
+                 console.log("Player Connected!");
+                 // [TAMBAHAN] Langsung kirim map ke orang ini!
+                 setTimeout(() => broadcastMap(conn), 1000); // Kasih delay dikit biar koneksi stabil
+            });
             console.log("Player Joined: " + conn.peer);
             
             conn.on('data', (data) => {
@@ -3430,8 +3439,95 @@
 
         function setupPlayerListener(conn) {
             conn.on('data', (data) => {
-                console.log("Data from Host:", data);
-                // Nanti kita handle update map dari DM disini
+                console.log("📦 Terima Paket:", data.type);
+
+                // KASUS 1: TERIMA PETA BARU (Full Load)
+                if (data.type === 'SYNC_FULL_MAP') {
+                    // Reconstruct Image Node
+                    const node = new ImageNode(data.imageSrc);
+                    node.altSrc = data.altSrc;
+                    
+                    // Restore Token & Pin (PENTING: Convert stats balik kalau perlu)
+                    node.tokens = data.tokens || [];
+                    node.pins = data.pins || [];
+
+                    state.currentImage = node;
+                    state.navigationStack = [node]; // Reset stack player
+                    
+                    // Restore Grid
+                    state.gridSize = data.gridSize;
+                    state.showGrid = data.showGrid;
+                    document.documentElement.style.setProperty('--grid-size', state.gridSize + 'px');
+
+                    renderImage();
+                    alert("DM just updated the map!");
+                }
+
+                // KASUS 2: TERIMA UPDATE GERAKAN (Ringan)
+                if (data.type === 'SYNC_UPDATE') {
+                    if (state.currentImage) {
+                        // Update posisi token tanpa reload gambar
+                        state.currentImage.tokens = data.tokens;
+                        
+                        // Update Grid
+                        state.gridSize = data.gridSize;
+                        state.showGrid = data.showGrid;
+                        document.documentElement.style.setProperty('--grid-size', state.gridSize + 'px');
+
+                        // Update Battle Tracker (Kalau lagi buka)
+                        state.combatants = data.combatants || [];
+                        state.currentTurnIndex = data.turnIndex || -1;
+                        if(battleTracker.style.display !== 'none') renderBattleListUI();
+
+                        renderImage();
+                    }
+                }
+            });
+        }
+
+        function broadcastMap(targetConn = null) {
+            if (!state.currentImage) return;
+
+            const mapPackage = {
+                type: 'SYNC_FULL_MAP',
+                imageSrc: state.currentImage.src,
+                altSrc: state.currentImage.altSrc,
+                gridSize: state.gridSize,
+                showGrid: state.showGrid,
+                // Kirim token & pin juga
+                tokens: state.currentImage.tokens,
+                pins: state.currentImage.pins
+            };
+
+            // Kalau ada target spesifik (Player baru join), kirim ke dia aja
+            if (targetConn) {
+                if(targetConn.open) targetConn.send(mapPackage);
+            } 
+            // Kalau gak ada target, kirim ke SEMUA player (Broadcast)
+            else {
+                connectedPlayers.forEach(conn => {
+                    if (conn.open) conn.send(mapPackage);
+                });
+            }
+            console.log("📡 Map Data Sent!");
+        }
+
+        // 2. KIRIM UPDATE RINGAN (Posisi Token & Grid)
+        // Panggil ini saat: Token digeser, HP berubah, Grid diubah
+        function broadcastUpdate() {
+            if (!isHost || !state.currentImage) return;
+
+            const updatePackage = {
+                type: 'SYNC_UPDATE',
+                tokens: state.currentImage.tokens, // Kirim posisi terbaru
+                gridSize: state.gridSize,
+                showGrid: state.showGrid,
+                combatants: state.combatants, // Kirim data Battle Tracker juga
+                turnIndex: state.currentTurnIndex
+            };
+
+            connectedPlayers.forEach(conn => {
+                if (conn.open) conn.send(updatePackage);
             });
         }
 
