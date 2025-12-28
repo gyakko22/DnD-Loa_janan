@@ -2877,11 +2877,10 @@
         }
 
         // 3. UPDATE FUNGSI SPAWN PLAYER (PENTING! Konversi Size ke Scale)
+        // --- UPDATE: SPAWN DENGAN ROSTER ID ---
         function spawnPlayerToMap(playerData) {
             const scale = getMonsterScale(playerData.size || 'Medium');
 
-            // [FIX UTAMA DISINI] 🛠️
-            // Pastikan HP dan AC tidak kosong/undefined. Kalau kosong kasih default.
             const safeHP = playerData.hp && playerData.hp !== "" ? playerData.hp : 10;
             const safeAC = playerData.ac && playerData.ac !== "" ? playerData.ac : 10;
             const safeInit = playerData.init && playerData.init !== "" ? playerData.init : 0;
@@ -2892,10 +2891,20 @@
                 ac: safeAC,
                 speed: playerData.speed || 30,
                 init: safeInit,
-                lvl: playerData.lvl || 1
+                lvl: playerData.lvl || 1,
+                
+                // [PENTING] Simpan ID Roster di dalam stats atau properti token
+                rosterId: playerData.id 
             };
 
-            state.currentImage.addToken(
+            // Cek apakah karakter ini sudah diklaim pemain?
+            // Kalau iya, token barunya langsung jadi milik dia.
+            let ownerPeerId = null;
+            if (playerData.claimedBy) {
+                ownerPeerId = playerData.claimedBy;
+            }
+
+            const token = state.currentImage.addToken(
                 pendingPlayerPos.x, 
                 pendingPlayerPos.y, 
                 'player', 
@@ -2905,13 +2914,16 @@
                 tokenStats 
             );
             
+            // Tempelkan status kepemilikan ke token fisik
+            if (ownerPeerId) token.claimedBy = ownerPeerId;
+            
             renderImage();
             closePlayerModal();
             
-            // Auto refresh battle tracker
-            if (battleTracker.style.display !== 'none') {
-                refreshBattleList();
-            }
+            if (battleTracker.style.display !== 'none') refreshBattleList();
+            
+            // Broadcast update map biar player liat token barunya
+            if (isHost) broadcastMap(); 
         }
 
         function toggleSection(id) {
@@ -3782,51 +3794,53 @@
         // 2. Host Menerima Laporan (Update `setupConnection`)
         // GANTI fungsi setupConnection yang lama dengan ini:
         // --- UPDATE HOST LOGIC (HANDLING JOIN REQUEST) ---
+        // --- UPDATE HOST LOGIC (ROSTER BASED) ---
         function setupConnection(conn) {
             connectedPlayers.push(conn);
             
             conn.on('open', () => {
                 console.log("Player mencoba masuk...");
 
-                // 1. CEK: Apakah DM sudah punya roster (Token Player)?
-                if (!state.currentImage) {
-                    conn.send({ type: 'JOIN_ERROR', msg: "DM belum buka Map!" });
+                // 1. CEK ROSTER (Daftar Tersimpan)
+                // Walau map kosong (state.currentImage null), kalau punya roster, boleh masuk.
+                if (!state.savedPlayers || state.savedPlayers.length === 0) {
+                    conn.send({ type: 'JOIN_ERROR', msg: "DM belum bikin Karakter di Roster!" });
                     return;
                 }
 
-                // Ambil token tipe 'player'
-                const roster = state.currentImage.tokens.filter(t => t.type === 'player');
-
-                if (roster.length === 0) {
-                    conn.send({ type: 'JOIN_ERROR', msg: "DM belum bikin Karakter (Roster Kosong)!" });
-                    return;
-                }
-
-                // 2. KIRIM LIST KARAKTER YANG TERSEDIA
-                // Filter yang belum di-claim orang lain
-                const availableChars = roster.map(t => ({
-                    id: t.id,
-                    name: t.name,
-                    cls: t.cls,
-                    isTaken: t.claimedBy ? true : false // Cek status kepemilikan
+                // 2. KIRIM LIST DARI ROSTER (Bukan Token Map)
+                const availableChars = state.savedPlayers.map(p => ({
+                    id: p.id,      // Ini Roster ID
+                    name: p.name,
+                    cls: p.cls,
+                    isTaken: p.claimedBy ? true : false // Cek properti di object roster
                 }));
 
                 conn.send({ type: 'ROSTER_SELECTION', chars: availableChars });
             });
 
             conn.on('data', (data) => {
-                // ... (Logic CLIENT_MOVE yang lama biarkan di sini) ...
-                if (data.type === 'CLIENT_MOVE') { /* ... kode lama ... */ }
+                if (data.type === 'CLIENT_MOVE') { 
+                    // ... (Logic Move Lama: Update token di map) ...
+                     data.tokens.forEach(pToken => {
+                        const hToken = findTokenById(state.currentImage, pToken.id);
+                        if (hToken) {
+                            hToken.x = pToken.x;
+                            hToken.y = pToken.y;
+                        }
+                    });
+                    renderImage();
+                    broadcastUpdate();
+                }
 
-                // 3. HANDLE REQUEST PILIH KARAKTER
+                // 3. HANDLE REQUEST PILIH KARAKTER (BY ROSTER ID)
                 if (data.type === 'REQUEST_CLAIM_CHAR') {
-                    handleClaimRequest(conn, data.tokenId);
+                    handleClaimRoster(conn, data.tokenId);
                 }
             });
 
             conn.on('close', () => {
-                // Kalau player keluar, lepaskan karakter dia biar bisa dipake orang lain
-                releaseCharacter(conn.peer);
+                releaseRosterCharacter(conn.peer);
                 connectedPlayers = connectedPlayers.filter(c => c !== conn);
                 showToast("Player Disconnected", "❌");
             });
@@ -4084,6 +4098,62 @@
 
                 grid.appendChild(div);
             });
+        }
+
+        // --- LOGIC BARU: CLAIM VIA ROSTER ---
+        function handleClaimRoster(conn, rosterId) {
+            // 1. Cari di Data Roster
+            const rosterItem = state.savedPlayers.find(p => p.id === rosterId);
+            
+            if (!rosterItem) {
+                conn.send({ type: 'JOIN_ERROR', msg: "Data Roster Error/Hilang!" });
+                return;
+            }
+
+            if (rosterItem.claimedBy && rosterItem.claimedBy !== conn.peer) {
+                conn.send({ type: 'JOIN_ERROR', msg: "Karakter sudah diambil!" });
+                return;
+            }
+
+            // 2. TANDAI ROSTER
+            rosterItem.claimedBy = conn.peer;
+
+            // 3. TANDAI TOKEN DI MAP (Jika Sudah Ada)
+            if (state.currentImage) {
+                state.currentImage.tokens.forEach(t => {
+                    // Cek apakah token ini adalah perwujudan dari roster tersebut?
+                    if (t.stats && t.stats.rosterId === rosterId) {
+                        t.claimedBy = conn.peer;
+                    }
+                });
+            }
+            
+            // 4. KIRIM SUKSES
+            // Kita kirim balik rosterId sebagai "myTokenId" buat pegangan player
+            conn.send({ type: 'JOIN_SUCCESS', tokenId: rosterId });
+            
+            showToast(`${rosterItem.name} bergabung!`, "👋");
+            
+            // Update map (biar DM liat perubahan status claimed kalau nanti ada visualnya)
+            if (state.currentImage) broadcastMap(conn);
+        }
+
+        function releaseRosterCharacter(peerId) {
+            // 1. Lepas di Roster
+            const rosterItem = state.savedPlayers.find(p => p.claimedBy === peerId);
+            if (rosterItem) {
+                rosterItem.claimedBy = null;
+                console.log(`Roster ${rosterItem.name} released.`);
+            }
+
+            // 2. Lepas di Map (Token Fisik)
+            if (state.currentImage) {
+                state.currentImage.tokens.forEach(t => {
+                    if (t.claimedBy === peerId) {
+                        t.claimedBy = null;
+                    }
+                });
+            }
         }
 
         init();
