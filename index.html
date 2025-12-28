@@ -1080,6 +1080,85 @@
             bottom: 20px !important; /* Turunin ke pojok */
         }
 
+        /* --- UPDATE POJOK KANAN BAWAH --- */
+
+        /* 1. Tombol Chat (Pojok Kanan Bawah) */
+        .chat-toggle-btn {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            width: 40px; height: 40px; /* Ukuran Kecil */
+            border-radius: 50%;
+            background: rgba(29, 29, 29, 0.9);
+            border: 1px solid var(--color-primary);
+            color: var(--color-primary);
+            display: flex; align-items: center; justify-content: center;
+            cursor: pointer; z-index: 100;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.5);
+            transition: transform 0.2s;
+            font-size: 18px;
+        }
+        .chat-toggle-btn:hover { transform: scale(1.1); background: var(--color-primary); color: #1a1a1a; }
+
+        /* 2. Tombol Alter Image (Dikecilin & Digeser ke Atas Chat) */
+        .image-switch-btn {
+            bottom: 70px !important; /* Geser ke atas tombol chat (20px + 40px + 10px gap) */
+            right: 20px !important;
+            width: 40px !important; height: 40px !important; /* Dikecilin */
+            font-size: 18px !important; /* Icon dikecilin */
+            /* Sisa style ikut yang lama */
+        }
+
+        /* 3. Jendela Chat Ngambang (Transparan) */
+        .chat-window {
+            position: fixed;
+            bottom: 80px; 
+            right: 70px; /* Muncul di sebelah kiri tombol */
+            width: 300px;
+            height: 400px;
+            
+            /* LEBIH TRANSPARAN DARI BATTLE TRACKER */
+            background: rgba(20, 20, 20, 0.6); /* Opacity 0.6 biar tembus pandang */
+            backdrop-filter: blur(4px); /* Blur dikit biar teks kebaca */
+            
+            border: 1px solid rgba(139, 69, 19, 0.5);
+            border-radius: 8px;
+            display: flex; flex-direction: column;
+            z-index: 999;
+            
+            /* Animasi */
+            visibility: hidden; opacity: 0; transform: translateY(20px);
+            transition: all 0.3s ease;
+        }
+
+        .chat-window.active {
+            visibility: visible; opacity: 1; transform: translateY(0);
+        }
+
+        .chat-header {
+            padding: 8px 12px;
+            background: rgba(0, 0, 0, 0.4); /* Header agak gelap dikit */
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+            color: var(--color-primary);
+            font-weight: bold; font-size: 13px;
+            cursor: move;
+            display: flex; justify-content: space-between; align-items: center;
+            user-select: none;
+        }
+
+        .chat-body {
+            flex: 1;
+            padding: 10px;
+            overflow-y: auto;
+            color: #ddd;
+            font-size: 12px;
+            /* Kosong dulu sesuai request */
+        }
+
+        /* Custom Scrollbar transparan */
+        .chat-body::-webkit-scrollbar { width: 4px; }
+        .chat-body::-webkit-scrollbar-thumb { background: rgba(139, 69, 19, 0.5); border-radius: 2px; }
+
     </style>
 </head>
 <body>
@@ -1253,6 +1332,19 @@
                     <div style="flex:1"></div> <button class="btn btn-secondary btn-sm" onclick="rollAllInitiative()">🎲 Roll All</button>
                     <button class="btn btn-primary btn-sm" onclick="nextTurn()">Next ▶</button>
                 </div>
+            </div>
+        </div>
+
+        <button class="chat-toggle-btn" id="chatBtn" title="Open Secret Window">
+            💬
+        </button>
+
+        <div id="chatWindow" class="chat-window">
+            <div class="chat-header" id="chatWindowHeader">
+                <span>Log</span> <button class="icon-btn close-btn" onclick="toggleChatWindow()">✕</button>
+            </div>
+            <div class="chat-body" id="chatBody">
+                <div style="text-align:center; color:#666; margin-top:50%;">Running...</div>
             </div>
         </div>
         
@@ -1587,6 +1679,8 @@
         const playerSelectModal = document.getElementById('playerSelectModal');
         const playerSavedList = document.getElementById('playerSavedList');
         const addPlayerForm = document.getElementById('addPlayerForm');
+        const chatBtn = document.getElementById('chatBtn');
+        const chatWindow = document.getElementById('chatWindow');
 
         class ImageNode {
             constructor(src, parentPinId = null) {
@@ -4154,6 +4248,21 @@
                     }
                 });
             }
+        }
+
+        function toggleChatWindow() {
+            if(chatWindow) chatWindow.classList.toggle('active');
+        }
+
+        // Pasang Listener buat tombol bulat
+        if (chatBtn) {
+            chatBtn.addEventListener('click', toggleChatWindow);
+        }
+
+        // Bikin Jendelanya Bisa Digeser (Wajib ada elemen HTML-nya dulu)
+        const chatWindowEl = document.getElementById("chatWindow");
+        if (chatWindowEl) {
+            makeDraggable(chatWindowEl);
         }
 
         init();
