@@ -1741,6 +1741,19 @@
         const chatBtn = document.getElementById('chatBtn');
         const chatWindow = document.getElementById('chatWindow');
 
+        // --- KONFIGURASI JARINGAN (HMPHH... BIAR GAK LEMOT!) ---
+        const peerConfig = {
+            debug: 2, // Level log biar kelihatan kalau ada error di Console
+            config: {
+                iceServers: [
+                    // Server Google (Gratis & Stabil) buat nembus NAT/Firewall
+                    { urls: 'stun:stun.l.google.com:19302' },
+                    { urls: 'stun:stun1.l.google.com:19302' },
+                    { urls: 'stun:stun2.l.google.com:19302' }
+                ]
+            }
+        };
+
         class ImageNode {
             constructor(src, parentPinId = null) {
                 this.id = Date.now() + Math.random();
@@ -3852,7 +3865,7 @@
             document.getElementById('lobbyStatus').innerText = "Connecting to P2P Server...";
             
             // Bikin Peer baru (biarkan server PeerJS yang kasih ID random)
-            peer = new Peer(); 
+            peer = new Peer(null, peerConfig);
 
             peer.on('open', (id) => {
                 isHost = true;
@@ -3883,25 +3896,36 @@
 
             document.getElementById('lobbyStatus').innerText = "Menghubungi DM...";
             
-            peer = new Peer(); 
+            // [FIX KONEKSI] Pakai Config STUN juga di sisi Player
+            peer = new Peer(null, peerConfig); 
 
             peer.on('open', (id) => {
-                const conn = peer.connect(hostId);
+                const conn = peer.connect(hostId, {
+                    reliable: true // [FIX] Minta koneksi yang lebih stabil (TCP)
+                });
                 
                 conn.on('open', () => {
                     console.log("Connected! Menunggu daftar karakter...");
                     document.getElementById('lobbyStatus').innerText = "Connected! Meminta data roster...";
                     
-                    // SIMPAN KONEKSI DULU
                     myConn = conn;
                     setupPlayerListener(conn);
-                    
-                    // JANGAN PANGGIL enterGameAsPlayer() DISINI LAGI!
-                    // Kita panggil nanti pas sudah pilih karakter.
                 });
                 
-                conn.on('error', (err) => showToast("Gagal: " + err));
+                // Handle Error pas mau connect
+                conn.on('error', (err) => {
+                    showToast("Gagal Konek: " + err);
+                    document.getElementById('lobbyStatus').innerText = "Gagal Konek. Cek ID atau Refresh.";
+                });
+                
+                // Handle kalau diputusin DM
+                conn.on('close', () => {
+                    alert("Koneksi terputus dari DM!");
+                    location.reload();
+                });
             });
+            
+            peer.on('error', (err) => showToast("Peer Error: " + err.type));
         }
 
         // 3. MASUK KE GAME (UI SWITCH)
