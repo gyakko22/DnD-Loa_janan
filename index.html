@@ -3908,7 +3908,7 @@
             peer = new Peer(null, peerConfig); 
 
             peer.on('open', (id) => {
-                const conn = peer.connect(hostId, { reliable: true });
+                const conn = peer.connect(hostId);
 
                 // [TAMBAHAN] Pasang timer timeout
                 // Kalau dalam 10 detik gak nyambung, kasih tau user
