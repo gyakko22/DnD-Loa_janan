@@ -1793,7 +1793,6 @@
 
         function init() { 
             setupEventListeners();
-            reattachHeaderListeners();
             document.documentElement.style.setProperty('--grid-size', state.gridSize + 'px');
          }
 
@@ -1984,10 +1983,6 @@
             makeDraggable(document.getElementById("battleTracker"));
             const btnBattle = document.getElementById('battleBtn');
             if(btnBattle) btnBattle.addEventListener('click', openBattleTracker);
-            if(btnBattle) btnBattle.onclick = openBattleTracker;
-
-            
-            
         }
         
         function updateGrid() {
@@ -4351,34 +4346,6 @@
                 chat.classList.toggle('minimized');
             }
         }
-
-        // --- FIX LISTENER YANG HILANG KARENA RE-WRITE HTML ---
-        // Karena tombol Upload/Save/dll kita tulis ulang di HTML baru, 
-        // listener lama di 'setupEventListeners' mungkin putus. 
-        // Kita pasang ulang di sini secara manual biar aman.
-        
-        function reattachHeaderListeners() {
-            // Helper buat pasang click event
-            const bind = (id, handler) => {
-                const el = document.getElementById(id);
-                if(el) el.onclick = handler; // Pakai onclick langsung biar gampang nimpa yang lama
-            };
-
-            bind('uploadBtn', () => document.getElementById('fileInput').click());
-            bind('saveBtn', saveToFile);
-            bind('loadBtn', loadFromFile); // Pastikan loadFromFile diexpose atau pass referensinya
-            bind('resetBtn', resetApp);
-            
-            // Battle & Builder pake ID lama, jadi listener lama di setupEventListeners()
-            // HARUSNYA masih jalan kalau ID-nya sama. Tapi kalau macet, bind manual disini:
-            const btnBattle = document.getElementById('battleBtn');
-            if(btnBattle) btnBattle.onclick = openBattleTracker;
-
-            const btnBuilder = document.getElementById('openBuilderBtn');
-            if(btnBuilder) btnBuilder.onclick = () => window.open('DAKONS_Encounter_Builder.html', 'DakonsBuilder', 'width=1000,height=800');
-        }
-
-        // Panggil fungsi reattach ini di dalam init() !
 
         init();
     </script>
